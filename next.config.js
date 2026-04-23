@@ -5,6 +5,7 @@ const withBundleAnalyzer = require("@next/bundle-analyzer")({
 /** @type {import('next').NextConfig} */
 
 const nextConfig = {
+  output: "standalone",
   reactStrictMode: true,
   transpilePackages: ["highlight.js"],
   experimental: {
@@ -64,7 +65,7 @@ const nextConfig = {
       fallback: [
         {
           source: "/:path*",
-          destination: "https://go.ray.so/:path*",
+          destination: "https://go.sqiu.dev/:path*",
         },
       ],
     };
@@ -76,10 +77,10 @@ const nextConfig = {
         has: [
           {
             type: "host",
-            value: "icon.ray.so",
+            value: "icon.snap.sqiu.dev",
           },
         ],
-        destination: "https://ray.so/icon/:path*",
+        destination: "https://snap.sqiu.dev/icon/:path*",
         permanent: true,
       },
       {
@@ -87,10 +88,10 @@ const nextConfig = {
         has: [
           {
             type: "host",
-            value: "icons.ray.so",
+            value: "icons.snap.sqiu.dev",
           },
         ],
-        destination: "https://ray.so/icon/:path*",
+        destination: "https://snap.sqiu.dev/icon/:path*",
         permanent: true,
       },
       {
@@ -98,10 +99,10 @@ const nextConfig = {
         has: [
           {
             type: "host",
-            value: "prompts.ray.so",
+            value: "prompts.snap.sqiu.dev",
           },
         ],
-        destination: "https://ray.so/prompts/:path*",
+        destination: "https://snap.sqiu.dev/prompts/:path*",
         permanent: true,
       },
       {
@@ -109,10 +110,10 @@ const nextConfig = {
         has: [
           {
             type: "host",
-            value: "presets.ray.so",
+            value: "presets.snap.sqiu.dev",
           },
         ],
-        destination: "https://ray.so/presets/:path*",
+        destination: "https://snap.sqiu.dev/presets/:path*",
         permanent: true,
       },
       {
@@ -120,10 +121,10 @@ const nextConfig = {
         has: [
           {
             type: "host",
-            value: "snippets.ray.so",
+            value: "snippets.snap.sqiu.dev",
           },
         ],
-        destination: "https://ray.so/snippets/:path*",
+        destination: "https://snap.sqiu.dev/snippets/:path*",
         permanent: true,
       },
       {
@@ -131,10 +132,10 @@ const nextConfig = {
         has: [
           {
             type: "host",
-            value: "themes.ray.so",
+            value: "themes.snap.sqiu.dev",
           },
         ],
-        destination: "https://ray.so/themes/:path*",
+        destination: "https://snap.sqiu.dev/themes/:path*",
         permanent: true,
       },
       {
@@ -142,10 +143,10 @@ const nextConfig = {
         has: [
           {
             type: "host",
-            value: "prompts.ray.so",
+            value: "prompts.snap.sqiu.dev",
           },
         ],
-        destination: "https://ray.so/api/:path*",
+        destination: "https://snap.sqiu.dev/api/:path*",
         permanent: true,
       },
       {
@@ -153,10 +154,10 @@ const nextConfig = {
         has: [
           {
             type: "host",
-            value: "presets.ray.so",
+            value: "presets.snap.sqiu.dev",
           },
         ],
-        destination: "https://ray.so/api/:path*",
+        destination: "https://snap.sqiu.dev/api/:path*",
         permanent: true,
       },
       {
@@ -164,10 +165,10 @@ const nextConfig = {
         has: [
           {
             type: "host",
-            value: "snippets.ray.so",
+            value: "snippets.snap.sqiu.dev",
           },
         ],
-        destination: "https://ray.so/api/:path*",
+        destination: "https://snap.sqiu.dev/api/:path*",
         permanent: true,
       },
       {
@@ -175,10 +176,10 @@ const nextConfig = {
         has: [
           {
             type: "host",
-            value: "themes.ray.so",
+            value: "themes.snap.sqiu.dev",
           },
         ],
-        destination: "https://ray.so/api/:path*",
+        destination: "https://snap.sqiu.dev/api/:path*",
         permanent: true,
       },
     ];
@@ -204,3 +205,5 @@ const nextConfig = {
 };
 
 module.exports = withBundleAnalyzer(nextConfig);
+
+

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Dub } from "dub";
 
+// Note: This route requires DUB_TOKEN and cannot be truly static
+// It will be prerendered but may fail during build if token is missing
 export const runtime = "edge";
 
 const dub = new Dub({
@@ -29,33 +31,42 @@ export async function GET(req: NextRequest) {
   const urlQuery = searchParams.get("url");
   const refQuery = searchParams.get("ref");
 
-  const url = new URL(urlQuery as string);
-  const tagId = getTagId(refQuery as refProps);
-
-  if (!url) {
-    return NextResponse.json({ error: "Missing URL" });
+  if (!urlQuery) {
+    return NextResponse.json({ error: "Missing URL" }, { status: 400 });
   }
 
-  if (!refQuery) {
-    return NextResponse.json({ error: "Missing ref" });
+  let url: URL;
+  try {
+    url = new URL(urlQuery);
+  } catch {
+    return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
   }
 
-  if (!tagId) {
-    return NextResponse.json({ error: "Invalid ref" });
-  }
+  const tagId = refQuery ? getTagId(refQuery as refProps) : undefined;
 
   if (
-    url.hostname.endsWith("ray.so") ||
+    url.hostname.endsWith("snap.sqiu.dev") ||
     url.hostname.includes("raycastapp.vercel.app") ||
     url.hostname === "localhost"
   ) {
-    const link = await dub.links.create({
-      url: url.href,
-      domain: "go.ray.so",
-      tagIds: [tagId],
-    });
-    return NextResponse.json({ link: `https://ray.so/${link.key}` });
+    try {
+      const link = await dub.links.create({
+        url: url.href,
+        domain: "go.sqiu.dev",
+        ...(tagId ? { tagIds: [tagId] } : {}),
+      });
+      return NextResponse.json({ link: `https://go.sqiu.dev/${link.key}` });
+    } catch {
+      // Fallback: if tag IDs are invalid for this Dub workspace, retry without tags.
+      const link = await dub.links.create({
+        url: url.href,
+        domain: "go.sqiu.dev",
+      });
+      return NextResponse.json({ link: `https://go.sqiu.dev/${link.key}` });
+    }
   }
 
   return NextResponse.json({ error: "Unable to shorten this link" }, { status: 400 });
 }
+
+
