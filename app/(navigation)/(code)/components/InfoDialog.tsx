@@ -25,7 +25,7 @@ export function InfoDialog() {
         <div className="flex gap-8">
           <div className="flex flex-col gap-3 flex-1 text-[13px] text-gray-11 leading-relaxed">
             <DialogTitle>About</DialogTitle>
-            <p>Code Images by Raycast is a tool to create beautiful screenshots of your code.</p>
+            <p>Code Images is a tool to create beautiful screenshots of your code.</p>
             <p>
               Pick a theme from a range of syntax colors and backgrounds, the language of your code and choose between
               light or dark mode.

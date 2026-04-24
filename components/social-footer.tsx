@@ -32,7 +32,7 @@ export function SocialFooter({ referral = "ray-so" }: { referral?: string }) {
           className="flex items-center gap-1.5 text-gray-12 group"
         >
           <RaycastLogoNegIcon className="w-4 h-4 text-brand" />
-          <span className="text-[13px] font-medium group-hover:underline">Made by Raycast</span>
+          <span className="text-[13px] font-medium group-hover:underline">ray.so</span>
         </a>
         <div className="flex gap-3">
           {socialLinks.map((link) => (

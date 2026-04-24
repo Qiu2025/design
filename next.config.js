@@ -94,94 +94,6 @@ const nextConfig = {
         destination: "https://snap.sqiu.dev/icon/:path*",
         permanent: true,
       },
-      {
-        source: "/((?!_next|api)):path(.*)",
-        has: [
-          {
-            type: "host",
-            value: "prompts.snap.sqiu.dev",
-          },
-        ],
-        destination: "https://snap.sqiu.dev/prompts/:path*",
-        permanent: true,
-      },
-      {
-        source: "/((?!_next|api)):path(.*)",
-        has: [
-          {
-            type: "host",
-            value: "presets.snap.sqiu.dev",
-          },
-        ],
-        destination: "https://snap.sqiu.dev/presets/:path*",
-        permanent: true,
-      },
-      {
-        source: "/((?!_next|api)):path(.*)",
-        has: [
-          {
-            type: "host",
-            value: "snippets.snap.sqiu.dev",
-          },
-        ],
-        destination: "https://snap.sqiu.dev/snippets/:path*",
-        permanent: true,
-      },
-      {
-        source: "/((?!_next|api)):path(.*)",
-        has: [
-          {
-            type: "host",
-            value: "themes.snap.sqiu.dev",
-          },
-        ],
-        destination: "https://snap.sqiu.dev/themes/:path*",
-        permanent: true,
-      },
-      {
-        source: "/api/:path*",
-        has: [
-          {
-            type: "host",
-            value: "prompts.snap.sqiu.dev",
-          },
-        ],
-        destination: "https://snap.sqiu.dev/api/:path*",
-        permanent: true,
-      },
-      {
-        source: "/api/:path*",
-        has: [
-          {
-            type: "host",
-            value: "presets.snap.sqiu.dev",
-          },
-        ],
-        destination: "https://snap.sqiu.dev/api/:path*",
-        permanent: true,
-      },
-      {
-        source: "/api/:path*",
-        has: [
-          {
-            type: "host",
-            value: "snippets.snap.sqiu.dev",
-          },
-        ],
-        destination: "https://snap.sqiu.dev/api/:path*",
-        permanent: true,
-      },
-      {
-        source: "/api/:path*",
-        has: [
-          {
-            type: "host",
-            value: "themes.snap.sqiu.dev",
-          },
-        ],
-        destination: "https://snap.sqiu.dev/api/:path*",
-        permanent: true,
-      },
     ];
   },
   async headers() {
@@ -205,5 +117,3 @@ const nextConfig = {
 };
 
 module.exports = withBundleAnalyzer(nextConfig);
-
-

@@ -7,11 +7,8 @@
 <h1 align="center">
   ray.so
 </h1>
-<h3 align="center">
-  Built by <a href="https://raycast.com/#ref=ray.so" target="_blank" rel="noopener noreferrer">Raycast</a>
-</h3>
 <p align="center">
-  Create code snippets, browse AI prompts, create extension icons and more.
+  Create beautiful code images and extension icons.
 </p>
 
 <p align="center">
@@ -27,15 +24,10 @@
 
 ## About
 
-This repository contains the source code for [ray.so](https://ray.so), a collection of tools built by [Raycast](https://raycast.com/#ref=ray.so). It includes:
+This repository contains the source code for [ray.so](https://ray.so), a collection of tools for creating code images and icons. It includes:
 
 - [**Code Images**](</app/(navigation)/(code)>): Create beautiful images of your code.
 - [**Icon Maker**](</app/(navigation)/icon/>): Create beautiful icons for Raycast Extensions.
-- [**Prompt Explorer**](</app/(navigation)/prompts/>): Explore AI Prompts for Raycast.
-- [**Preset Explorer**](</app/(navigation)/presets/>): Explore AI Presets for Raycast.
-- [**Quicklink Explorer**](</app/(navigation)/quicklinks/>): Browse and import Raycast Quicklinks.
-- [**Snippet Explorer**](</app/(navigation)/snippets/>): Browse and import Raycast Snippets.
-- [**Theme Explorer**](</app/(navigation)/themes/>): Browse and import Raycast Themes.
 
 ## Setup
 
@@ -50,34 +42,9 @@ npm run dev
 
 ## Contributing
 
-We welcome contributions primarily in the form of new presets, prompts, snippets, themes, and bug fixes.
+We welcome contributions in the form of improvements, bug fixes, and UX enhancements for Code Images and Icon Maker.
 
-> [!NOTE]
-> If you're interested in creating a new code theme we recommend forking the project to run your own version. However, certain partner themes may be considered. Please reach out by creating an issue or [contacting us](mailto:feedback+rayso@raycast.com) first.
+If you'd like to contribute:
 
-If you're interested in contributing, follow the steps below:
-
-### Presets, Prompts, Quicklinks & Snippets
-
-- Open [prompts.ts](</app/(navigation)/prompts/prompts.ts>) or [presets.ts](</app/(navigation)/presets/presets.ts>) or [snippets.ts](</app/(navigation)/snippets/snippets.ts>) or [quicklinks.ts](</app/(navigation)/quicklinks/quicklinks.ts>)
-- Add your data to the relevant category
-  - Ensure it includes all fields, and that they're unique within their category
-- Add your name and (optional) website url to the `author` field
-- Create a pull request
-
-### Themes
-
-#### 1. Copy the Theme JSON from Raycast
-
-- Open Theme Studio in Raycast
-- Right click on your Theme and select "Copy as JSON"
-
-#### 2. Add the theme to repo
-
-- In [themes](</app/(navigation)/themes/themes>), create a folder with your Raycast username, ie: `peduarte`
-- In that folder, create a file with the theme name, ie: `red.json`
-- In that file, paste the theme JSON you copied from Raycast's Theme Studio
-
-#### 3. Commit and push your changes
-
-- Create a Pull Request 🚀
+- Open an issue describing the change, or submit a pull request directly.
+- Keep changes focused and include screenshots for UI updates when possible.

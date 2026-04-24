@@ -23,7 +23,7 @@ export function InfoDialog() {
         <div className="flex gap-8">
           <div className="flex flex-col gap-3 flex-1 text-[13px] text-gray-11 leading-relaxed">
             <DialogTitle>About</DialogTitle>
-            <p>Icon Maker by Raycast is a tool to easily create and export icons for your extensions.</p>
+            <p>Icon Maker is a tool to easily create and export icons for your extensions.</p>
             <p>
               Use the Raycast icon library to search for an icon, change the color of the icon, and customize the
               background to create a beautifully simple icon.

@@ -23,10 +23,6 @@
     "paths": {
       "@/*": ["./*"],
       "@code/*": ["./app/(navigation)/(code)/*"],
-      "@presets/*": ["./app/(navigation)/presets/*"],
-      "@prompts/*": ["./app/(navigation)/prompts/*"],
-      "@snippets/*": ["./app/(navigation)/snippets/*"],
-      "@themes/*": ["./app/(navigation)/themes/*"],
       "@icon/*": ["./app/(navigation)/icon/*"]
     }
   },

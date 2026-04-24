@@ -11,12 +11,7 @@ const dub = new Dub({
 
 const tagIdsByRef = {
   codeImage: "clsokhlen0001kz0gxlqfgpp0",
-  snippets: "clsokhqzy0003kz0gxdhcycue",
-  prompts: "clsokhzja0006kz0g64z47gfr",
-  themes: "clsoki8190008kz0gzajzalh7",
   icons: "cltyfpaho0001lwxwdcd93mkc",
-  presets: "clu9ko3n300068tq0zhk7bc7f",
-  quicklinks: "cm0qhn6fo000w3dl1i22hcgoz",
   desktopClient: "tag_LmjLVKbcZB45xNbcgNPLV0Hh",
 };
 
@@ -68,5 +63,3 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ error: "Unable to shorten this link" }, { status: 400 });
 }
-
-

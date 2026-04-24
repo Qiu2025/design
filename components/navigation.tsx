@@ -1,26 +1,13 @@
 "use client";
 
-import { useRouter, useSelectedLayoutSegments } from "next/navigation";
+import { useSelectedLayoutSegments } from "next/navigation";
+import type { ReactNode } from "react";
 
-import {
-  BrandGithubIcon,
-  BrandSlackIcon,
-  BrandXIcon,
-  BrandYoutubeIcon,
-  ChevronDownIcon,
-  ChevronLeftIcon,
-  RaycastLogoNegIcon,
-} from "@raycast/icons";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "./dropdown-menu";
+import { ChevronLeftIcon } from "@raycast/icons";
 import Link from "next/link";
 import { cn } from "@/utils/cn";
 import CodeImagesIcon from "@/app/assets/code-images.svg";
 import IconMakerIcon from "@/app/assets/icon-maker.svg";
-import SnippetExplorerIcon from "@/app/assets/snippet-explorer.svg";
-import PresetExplorerIcon from "@/app/assets/preset-explorer.svg";
-import QuicklinkExplorerIcon from "@/app/assets/quicklink-explorer.svg";
-import PromptExplorerIcon from "@/app/assets/prompt-explorer.svg";
-import ThemeExplorerIcon from "@/app/assets/theme-explorer.svg";
 import { Button } from "./button";
 
 const links = [
@@ -36,44 +23,13 @@ const links = [
     description: "Create beautiful icons",
     icon: IconMakerIcon,
   },
-  {
-    href: "/prompts",
-    label: "Prompts",
-    description: "Explore AI Prompts for Raycast",
-    icon: PromptExplorerIcon,
-  },
-  {
-    href: "/presets",
-    label: "Presets",
-    description: "Explore AI Presets for Raycast",
-    icon: PresetExplorerIcon,
-  },
-  {
-    href: "/quicklinks",
-    label: "Quicklinks",
-    description: "Explore Raycast Quicklinks",
-    icon: QuicklinkExplorerIcon,
-  },
-  {
-    href: "/snippets",
-    label: "Snippets",
-    description: "Browse and import Raycast Snippets",
-    icon: SnippetExplorerIcon,
-  },
-  {
-    href: "/themes",
-    label: "Themes",
-    description: "Browse and import Raycast Themes",
-    icon: ThemeExplorerIcon,
-  },
 ];
 
 export function Navigation() {
-  const router = useRouter();
   const segments = useSelectedLayoutSegments();
   const segment = segments[0] || "(code)";
-  const showBackButton = segments.find((s) => s === "shared") ? segments.length > 1 : segments.length > 2;
-  const activeLink = links.find((link) => (segment === "(code)" ? links[0] : link.href.includes(segment))) || links[0];
+  const showBackButton = segments.includes("shared") ? segments.length > 1 : segments.length > 2;
+  const backHref = segment === "icon" ? "/icon" : "/";
 
   return (
     <nav className="flex items-center gap-3 h-[50px] pl-4 pr-5 bg-gray-2 text-white w-full fixed z-10">
@@ -90,55 +46,38 @@ export function Navigation() {
             showBackButton ? "opacity-100 scale-100" : "opacity-0 scale-75",
           )}
         >
-          <Link
-            href={`/${segment}`}
-            aria-label="Home"
-            aria-disabled={!showBackButton}
-            tabIndex={showBackButton ? 0 : -1}
-          >
+          <Link href={backHref} aria-label="Home" aria-disabled={!showBackButton} tabIndex={showBackButton ? 0 : -1}>
             <ChevronLeftIcon className="w-4 h-4 shrink-0" />
           </Link>
         </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="transparent" className="py-1 pl-1 pr-2 gap-2 data-[state=open]:bg-gray-4 text-gray-12">
-              {activeLink.icon && <activeLink.icon className="w-6 h-6" />}
-              <span className="text-[15px] font-medium">{activeLink.label}</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="p-2 gap-1.5 flex flex-col">
-            {links.map((link) => (
-              <DropdownMenuItem
+        <div className="flex items-center gap-1 bg-gray-3/80 rounded-md p-1">
+          {links.map((link) => {
+            const isActive = link.href === "/" ? segment === "(code)" : segment === "icon";
+
+            return (
+              <Button
                 key={link.href}
-                onSelect={() => router.push(link.href)}
-                className="pl-[10px] pr-6 py-2 group"
+                asChild
+                variant="transparent"
+                className={cn(
+                  "px-2.5 py-1.5 gap-2 text-gray-11 hover:text-gray-12",
+                  isActive && "bg-gray-4 text-gray-12 hover:bg-gray-4",
+                )}
               >
-                <div className="flex gap-3 items-center">
-                  {link.icon && <link.icon className="w-8 h-8" />}
-                  <div className="flex flex-col leading-none gap-1">
-                    <span className="text-[15px] font-medium text-gray-12">{link.label}</span>
-                    <span className="text-[13px] text-gray-9 group-hover:text-gray-10">{link.description}</span>
-                  </div>
-                </div>
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <div className="-ml-2 flex items-center relative z-10 gap-[4px]">
-          <span className="text-sm text-gray-9">by </span>
-          <Button variant="transparent" asChild className="pl-[8px]">
-            <a href="https://raycast.com#ref=ray-so" target="_blank" rel="noopener">
-              <RaycastLogoNegIcon className="w-5 h-5 text-brand" />
-              <span className="text-sm text-gray-12 font-medium hidden sm:block">Raycast</span>
-            </a>
-          </Button>
+                <Link href={link.href} aria-current={isActive ? "page" : undefined}>
+                  {link.icon && <link.icon className="w-5 h-5" />}
+                  <span className="text-[14px] font-medium hidden sm:inline">{link.label}</span>
+                </Link>
+              </Button>
+            );
+          })}
         </div>
       </div>
     </nav>
   );
 }
 
-export function NavigationActions({ children, className }: { children: React.ReactNode; className?: string }) {
+export function NavigationActions({ children, className }: Readonly<{ children: ReactNode; className?: string }>) {
   return (
     <div
       className={cn(

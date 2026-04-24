@@ -3,7 +3,7 @@ import { IconGenerator } from "./icon-generator";
 import { Suspense } from "react";
 import OgImage from "./assets/og-image.png";
 
-const pageTitle = "Icon Maker by Raycast";
+const pageTitle = "Icon Maker";
 const pageDescription = "Create beautiful icons for your next project, app, or Raycast extension.";
 const ogUrl = OgImage.src;
 
