@@ -9,6 +9,25 @@ const dub = new Dub({
   token: process.env.DUB_TOKEN,
 });
 
+const SHORT_LINK_PUBLIC_DOMAIN = "snap.sqiu.dev";
+const DUB_LINK_DOMAIN = "go.sqiu.dev";
+
+const getCanonicalAppOrigin = () => {
+  const configured = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
+
+  if (configured) {
+    try {
+      return new URL(configured).origin;
+    } catch {
+      // Fallback to the public domain when env value is malformed.
+    }
+  }
+
+  return `https://${SHORT_LINK_PUBLIC_DOMAIN}`;
+};
+
+const canonicalAppOrigin = getCanonicalAppOrigin();
+
 const tagIdsByRef = {
   codeImage: "clsokhlen0001kz0gxlqfgpp0",
   icons: "cltyfpaho0001lwxwdcd93mkc",
@@ -19,6 +38,25 @@ export type refProps = keyof typeof tagIdsByRef;
 
 const getTagId = (ref: refProps) => {
   return ref ? tagIdsByRef[ref] : undefined;
+};
+
+const normalizeDestinationUrl = (url: URL) => {
+  const isLocalhost =
+    url.hostname === "localhost" ||
+    url.hostname === "127.0.0.1" ||
+    url.hostname === "[::1]" ||
+    url.hostname.startsWith("192.168.");
+
+  if (!isLocalhost) {
+    return url.href;
+  }
+
+  const normalized = new URL(url.href);
+  const canonical = new URL(canonicalAppOrigin);
+  normalized.protocol = canonical.protocol;
+  normalized.host = canonical.host;
+
+  return normalized.href;
 };
 
 export async function GET(req: NextRequest) {
@@ -38,26 +76,30 @@ export async function GET(req: NextRequest) {
   }
 
   const tagId = refQuery ? getTagId(refQuery as refProps) : undefined;
+  const destinationUrl = normalizeDestinationUrl(url);
 
   if (
-    url.hostname.endsWith("snap.sqiu.dev") ||
+    url.hostname.endsWith(SHORT_LINK_PUBLIC_DOMAIN) ||
     url.hostname.includes("raycastapp.vercel.app") ||
-    url.hostname === "localhost"
+    url.hostname === "localhost" ||
+    url.hostname === "127.0.0.1" ||
+    url.hostname === "[::1]" ||
+    url.hostname.startsWith("192.168.")
   ) {
     try {
       const link = await dub.links.create({
-        url: url.href,
-        domain: "go.sqiu.dev",
+        url: destinationUrl,
+        domain: DUB_LINK_DOMAIN,
         ...(tagId ? { tagIds: [tagId] } : {}),
       });
-      return NextResponse.json({ link: `https://go.sqiu.dev/${link.key}` });
+      return NextResponse.json({ link: `https://${SHORT_LINK_PUBLIC_DOMAIN}/${link.key}` });
     } catch {
       // Fallback: if tag IDs are invalid for this Dub workspace, retry without tags.
       const link = await dub.links.create({
-        url: url.href,
-        domain: "go.sqiu.dev",
+        url: destinationUrl,
+        domain: DUB_LINK_DOMAIN,
       });
-      return NextResponse.json({ link: `https://go.sqiu.dev/${link.key}` });
+      return NextResponse.json({ link: `https://${SHORT_LINK_PUBLIC_DOMAIN}/${link.key}` });
     }
   }
 

@@ -45,7 +45,6 @@ import ExportModal from "./components/ExportModal";
 import styles from "./icon-generator.module.css";
 
 import type { SettingsType } from "./lib/types";
-import { BASE_URL } from "@/utils/common";
 import { ButtonGroup } from "@/components/button-group";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/dropdown-menu";
 import usePngClipboardSupported from "../(code)/util/usePngClipboardSupported";
@@ -435,15 +434,14 @@ export const IconGenerator = () => {
 
   const onCopyShareUrl = async () => {
     showInfoMessage("Copying URL to clipboard…", false);
-    const url = `${BASE_URL}/icon?${new URLSearchParams(
-      Object.entries(settings).map(([key, value]) => [key, String(value)]),
-    ).toString()}`;
+    const shareUrl = new URL("/icon", globalThis.window.location.origin);
+    Object.entries(settings).forEach(([key, value]) => {
+      shareUrl.searchParams.set(key, String(value));
+    });
 
-    let urlToCopy = url;
-    const encodedUrl = encodeURIComponent(url);
-    const response = await fetch(`https://ray.so/api/shorten-url?url=${encodedUrl}&ref=icons`).then((res) =>
-      res.json(),
-    );
+    let urlToCopy = shareUrl.toString();
+    const encodedUrl = encodeURIComponent(urlToCopy);
+    const response = await fetch(`/api/shorten-url?url=${encodedUrl}&ref=icons`).then((res) => res.json());
 
     if (response.link) {
       urlToCopy = response.link;
