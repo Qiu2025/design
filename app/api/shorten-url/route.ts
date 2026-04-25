@@ -1,16 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Dub } from "dub";
 
-// Note: This route requires DUB_TOKEN and cannot be truly static
-// It will be prerendered but may fail during build if token is missing
 export const runtime = "edge";
 
-const dub = new Dub({
-  token: process.env.DUB_TOKEN,
-});
-
 const SHORT_LINK_PUBLIC_DOMAIN = "snap.sqiu.dev";
-const DUB_LINK_DOMAIN = "go.sqiu.dev";
+const SHLINK_SHORT_DOMAIN = process.env.SHORT_URL_DOMAIN || "go.sqiu.dev";
+const SHLINK_API_KEY = process.env.SHLINK_API_KEY;
+
+const getShlinkBaseUrl = () => {
+  const configured = process.env.SHLINK_BASE_URL;
+
+  if (configured) {
+    try {
+      return new URL(configured).origin;
+    } catch {
+      // Fallback to short domain when env value is malformed.
+    }
+  }
+
+  return `https://${SHLINK_SHORT_DOMAIN}`;
+};
+
+const shlinkBaseUrl = getShlinkBaseUrl();
 
 const getCanonicalAppOrigin = () => {
   const configured = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
@@ -28,30 +38,49 @@ const getCanonicalAppOrigin = () => {
 
 const canonicalAppOrigin = getCanonicalAppOrigin();
 
-const tagIdsByRef = {
-  codeImage: "clsokhlen0001kz0gxlqfgpp0",
-  icons: "cltyfpaho0001lwxwdcd93mkc",
-  desktopClient: "tag_LmjLVKbcZB45xNbcgNPLV0Hh",
+const refs = ["codeImage", "icons", "desktopClient"] as const;
+
+export type refProps = (typeof refs)[number];
+
+const isRef = (value: string | null): value is refProps => {
+  return value !== null && refs.some((ref) => ref === value);
 };
 
-export type refProps = keyof typeof tagIdsByRef;
-
-const getTagId = (ref: refProps) => {
-  return ref ? tagIdsByRef[ref] : undefined;
-};
-
-const createShortLink = async (destinationUrl: string, tagId?: string) => {
-  const link = await dub.links.create({
-    url: destinationUrl,
-    domain: DUB_LINK_DOMAIN,
-    ...(tagId ? { tagIds: [tagId] } : {}),
-  });
-
-  if (!link?.key) {
-    throw new Error("Dub response missing key");
+const createShortLink = async (destinationUrl: string, ref?: refProps) => {
+  if (!SHLINK_API_KEY) {
+    throw new Error("SHLINK_API_KEY is not configured");
   }
 
-  return link.key;
+  const payload: Record<string, unknown> = {
+    longUrl: destinationUrl,
+    domain: SHLINK_SHORT_DOMAIN,
+  };
+
+  if (ref) {
+    payload.tags = [ref];
+  }
+
+  const response = await fetch(`${shlinkBaseUrl}/rest/v3/short-urls`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Api-Key": SHLINK_API_KEY,
+    },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`Shlink responded with status ${response.status}`);
+  }
+
+  const data = (await response.json()) as { shortUrl?: string };
+
+  if (!data.shortUrl) {
+    throw new Error("Shlink response missing shortUrl");
+  }
+
+  return data.shortUrl;
 };
 
 const normalizeDestinationUrl = (url: URL) => {
@@ -89,12 +118,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid URL" }, { status: 400 });
   }
 
-  const tagId = refQuery ? getTagId(refQuery as refProps) : undefined;
+  const ref = isRef(refQuery) ? refQuery : undefined;
   const destinationUrl = normalizeDestinationUrl(url);
 
   if (
     url.hostname.endsWith(SHORT_LINK_PUBLIC_DOMAIN) ||
-    url.hostname.endsWith(DUB_LINK_DOMAIN) ||
+    url.hostname.endsWith(SHLINK_SHORT_DOMAIN) ||
     url.hostname.includes("raycastapp.vercel.app") ||
     url.hostname === "localhost" ||
     url.hostname === "127.0.0.1" ||
@@ -102,16 +131,11 @@ export async function GET(req: NextRequest) {
     url.hostname.startsWith("192.168.")
   ) {
     try {
-      const key = await createShortLink(destinationUrl, tagId);
-      return NextResponse.json({ link: `https://${DUB_LINK_DOMAIN}/${key}` });
+      const shortUrl = await createShortLink(destinationUrl, ref);
+      return NextResponse.json({ link: shortUrl });
     } catch {
-      // Fallback: if tag IDs are invalid for this Dub workspace, retry without tags.
-      try {
-        const key = await createShortLink(destinationUrl);
-        return NextResponse.json({ link: `https://${DUB_LINK_DOMAIN}/${key}` });
-      } catch {
-        return NextResponse.json({ error: "Unable to shorten this link" }, { status: 500 });
-      }
+      // Fallback: keep the original long URL when shortener is unavailable.
+      return NextResponse.json({ link: destinationUrl });
     }
   }
 
