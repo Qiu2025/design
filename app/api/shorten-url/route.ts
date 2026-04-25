@@ -1,30 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 const SHORT_LINK_PUBLIC_DOMAIN = "snap.sqiu.dev";
-const SHLINK_API_KEY = process.env.SHLINK_API_KEY;
 
 const DEFAULT_SHLINK_BASE_URL = "https://go.sqiu.dev";
 
+const readEnv = (value: string | undefined) => {
+  const trimmed = value?.trim();
+
+  if (!trimmed) {
+    return trimmed;
+  }
+
+  const wrappedInDoubleQuotes = trimmed.startsWith('"') && trimmed.endsWith('"');
+  const wrappedInSingleQuotes = trimmed.startsWith("'") && trimmed.endsWith("'");
+
+  if (wrappedInDoubleQuotes || wrappedInSingleQuotes) {
+    return trimmed.slice(1, -1);
+  }
+
+  return trimmed;
+};
+
 const getShlinkConfig = () => {
-  const configured = process.env.SHLINK_BASE_URL || DEFAULT_SHLINK_BASE_URL;
+  const configured = readEnv(process.env.SHLINK_BASE_URL) || DEFAULT_SHLINK_BASE_URL;
+  const configuredShortDomain = readEnv(process.env.SHLINK_SHORT_DOMAIN);
 
   try {
     const parsed = new URL(configured);
     return {
       shlinkBaseUrl: parsed.origin,
-      shlinkShortDomain: parsed.hostname,
+      shlinkShortDomain: configuredShortDomain || parsed.hostname,
     };
   } catch {
     return {
       shlinkBaseUrl: DEFAULT_SHLINK_BASE_URL,
-      shlinkShortDomain: new URL(DEFAULT_SHLINK_BASE_URL).hostname,
+      shlinkShortDomain: configuredShortDomain || new URL(DEFAULT_SHLINK_BASE_URL).hostname,
     };
   }
 };
 
 const { shlinkBaseUrl, shlinkShortDomain } = getShlinkConfig();
+
+const getShlinkApiKey = () => readEnv(process.env.SHLINK_API_KEY);
 
 const getCanonicalAppOrigin = () => {
   const configured = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
@@ -47,35 +66,23 @@ const refs = ["codeImage", "icons", "desktopClient"] as const;
 export type refProps = (typeof refs)[number];
 
 const isRef = (value: string | null): value is refProps => {
-  return value !== null && refs.some((ref) => ref === value);
+  return value !== null && refs.includes(value as refProps);
 };
 
-const createShortLink = async (destinationUrl: string, ref?: refProps) => {
-  if (!SHLINK_API_KEY) {
-    throw new Error("SHLINK_API_KEY is not configured");
-  }
-
-  const payload: Record<string, unknown> = {
-    longUrl: destinationUrl,
-    domain: shlinkShortDomain,
-  };
-
-  if (ref) {
-    payload.tags = [ref];
-  }
-
+const requestShlinkShortUrl = async (payload: Record<string, unknown>, shlinkApiKey: string) => {
   const response = await fetch(`${shlinkBaseUrl}/rest/v3/short-urls`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Api-Key": SHLINK_API_KEY,
+      "X-Api-Key": shlinkApiKey,
     },
     body: JSON.stringify(payload),
     cache: "no-store",
   });
 
   if (!response.ok) {
-    throw new Error(`Shlink responded with status ${response.status}`);
+    const errorBody = await response.text();
+    throw new Error(`Shlink responded with status ${response.status}: ${errorBody}`);
   }
 
   const data = (await response.json()) as { shortUrl?: string };
@@ -85,6 +92,31 @@ const createShortLink = async (destinationUrl: string, ref?: refProps) => {
   }
 
   return data.shortUrl;
+};
+
+const createShortLink = async (destinationUrl: string, ref?: refProps) => {
+  const shlinkApiKey = getShlinkApiKey();
+
+  if (!shlinkApiKey) {
+    throw new Error("SHLINK_API_KEY is not configured");
+  }
+
+  const payload: Record<string, unknown> = { longUrl: destinationUrl };
+
+  if (ref) {
+    payload.tags = [ref];
+  }
+
+  try {
+    return await requestShlinkShortUrl({ ...payload, domain: shlinkShortDomain }, shlinkApiKey);
+  } catch (error) {
+    // Some Shlink setups reject unknown domains; retry without forcing a specific one.
+    console.warn("Shlink domain-specific shorten failed. Retrying without domain.", {
+      shlinkShortDomain,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+    return requestShlinkShortUrl(payload, shlinkApiKey);
+  }
 };
 
 const normalizeDestinationUrl = (url: URL) => {
@@ -137,7 +169,14 @@ export async function GET(req: NextRequest) {
     try {
       const shortUrl = await createShortLink(destinationUrl, ref);
       return NextResponse.json({ link: shortUrl });
-    } catch {
+    } catch (error) {
+      console.error("Shlink shorten failed. Returning long URL fallback.", {
+        shlinkBaseUrl,
+        shlinkShortDomain,
+        destinationUrl,
+        ref,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
       // Fallback: keep the original long URL when shortener is unavailable.
       return NextResponse.json({ link: destinationUrl });
     }
