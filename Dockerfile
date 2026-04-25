@@ -24,8 +24,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV SHORT_URL_DOMAIN="go.sqiu.dev"
-ENV SHLINK_BASE_URL="https://go.sqiu.dev"
+ENV SHLINK_BASE_URL=""
 ENV SHLINK_API_KEY=""
 
 RUN addgroup --system --gid 1001 nodejs

@@ -3,24 +3,28 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "edge";
 
 const SHORT_LINK_PUBLIC_DOMAIN = "snap.sqiu.dev";
-const SHLINK_SHORT_DOMAIN = process.env.SHORT_URL_DOMAIN || "go.sqiu.dev";
 const SHLINK_API_KEY = process.env.SHLINK_API_KEY;
 
-const getShlinkBaseUrl = () => {
-  const configured = process.env.SHLINK_BASE_URL;
+const DEFAULT_SHLINK_BASE_URL = "https://go.sqiu.dev";
 
-  if (configured) {
-    try {
-      return new URL(configured).origin;
-    } catch {
-      // Fallback to short domain when env value is malformed.
-    }
+const getShlinkConfig = () => {
+  const configured = process.env.SHLINK_BASE_URL || DEFAULT_SHLINK_BASE_URL;
+
+  try {
+    const parsed = new URL(configured);
+    return {
+      shlinkBaseUrl: parsed.origin,
+      shlinkShortDomain: parsed.hostname,
+    };
+  } catch {
+    return {
+      shlinkBaseUrl: DEFAULT_SHLINK_BASE_URL,
+      shlinkShortDomain: new URL(DEFAULT_SHLINK_BASE_URL).hostname,
+    };
   }
-
-  return `https://${SHLINK_SHORT_DOMAIN}`;
 };
 
-const shlinkBaseUrl = getShlinkBaseUrl();
+const { shlinkBaseUrl, shlinkShortDomain } = getShlinkConfig();
 
 const getCanonicalAppOrigin = () => {
   const configured = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
@@ -53,7 +57,7 @@ const createShortLink = async (destinationUrl: string, ref?: refProps) => {
 
   const payload: Record<string, unknown> = {
     longUrl: destinationUrl,
-    domain: SHLINK_SHORT_DOMAIN,
+    domain: shlinkShortDomain,
   };
 
   if (ref) {
@@ -123,7 +127,7 @@ export async function GET(req: NextRequest) {
 
   if (
     url.hostname.endsWith(SHORT_LINK_PUBLIC_DOMAIN) ||
-    url.hostname.endsWith(SHLINK_SHORT_DOMAIN) ||
+    url.hostname.endsWith(shlinkShortDomain) ||
     url.hostname.includes("raycastapp.vercel.app") ||
     url.hostname === "localhost" ||
     url.hostname === "127.0.0.1" ||
