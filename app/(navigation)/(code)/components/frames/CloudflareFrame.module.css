@@ -1,4 +1,6 @@
 .frame {
+  overflow: hidden;
+  border-radius: var(--frame-background-radius, 16px);
   background: #0c0c0c;
 }
 

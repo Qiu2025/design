@@ -39,7 +39,7 @@
   border: 1px solid transparent;
   border-radius: var(--radius);
   background-color: var(--nuxt-background);
-  --radius: 10px;
+  --radius: var(--frame-window-radius, 10px);
   --nuxt-background: #0b0c11;
   --nuxt-border-gradient: linear-gradient(var(--gradient-angle), #00dc82, #00a86b);
 

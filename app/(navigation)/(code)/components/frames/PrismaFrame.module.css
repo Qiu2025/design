@@ -9,7 +9,7 @@
   border: 1px solid transparent;
   border-radius: var(--radius);
   background-color: var(--background);
-  --radius: 10px;
+  --radius: var(--frame-window-radius, 10px);
   --frame-border-gradient: linear-gradient(var(--gradient-angle), #3e4083, #16544f);
   --background: hsla(223, 41%, 7%, 75%);
 

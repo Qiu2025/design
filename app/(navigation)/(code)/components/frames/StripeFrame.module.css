@@ -65,7 +65,7 @@
   position: relative;
   z-index: 1;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--frame-window-radius, 8px);
   background: var(--window);
   box-shadow:
     rgba(50, 50, 93, 0.25) 0px 50px 100px -20px,

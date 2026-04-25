@@ -29,7 +29,7 @@
   min-height: 100px;
   flex-direction: column;
   align-items: stretch;
-  border-radius: 26px;
+  border-radius: var(--frame-window-radius, 26px);
   background: #16181d;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
   transition: all ease 0.3s;

@@ -15,7 +15,7 @@
 .window {
   position: relative;
   padding: 3px;
-  border-radius: 8px;
+  border-radius: var(--frame-window-radius, 8px);
   background: #111111;
   box-shadow:
     0 0 0 1px rgb(0 0 0 / 35%),
@@ -28,7 +28,7 @@
 }
 
 .code {
-  border-radius: 5px;
+  border-radius: max(0px, calc(var(--frame-window-radius, 8px) - 3px));
   background: #191919;
   box-shadow:
     0 0 0 1px rgb(0 0 0 / 8%),

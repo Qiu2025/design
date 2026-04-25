@@ -1,5 +1,7 @@
 .frame {
   --line-number: rgba(255, 255, 255, 0.2);
+  overflow: hidden;
+  border-radius: var(--frame-background-radius, 16px);
   background: #121a29;
   font-family: var(--font-soehne-mono);
 
@@ -26,7 +28,7 @@
   position: relative;
   z-index: 1;
   border: 0.5px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  border-radius: var(--frame-window-radius, 8px);
   background: #232b41;
   box-shadow:
     0px 100px 89px 0px rgba(0, 0, 0, 0.07),
@@ -44,7 +46,7 @@
   .window {
     position: relative;
     border: 0.5px solid rgba(0, 0, 0, 0.1);
-    border-radius: 8px;
+    border-radius: var(--frame-window-radius, 8px);
     background: #fff;
     box-shadow:
       0px 73px 83px 0px rgba(0, 0, 0, 0.03),

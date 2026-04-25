@@ -1,6 +1,7 @@
 .frame {
   position: relative;
   overflow: visible;
+  border-radius: var(--frame-background-radius, 16px);
   --background: black;
   --grid-color: #222;
 

@@ -4,7 +4,7 @@
   --selection-text-color: #007763fd;
   --frame-header-background: hsla(0, 0%, 100%, 0.1);
   --frame-border: hsla(0, 0%, 24%, 0.13);
-  --frame-border-radius: 8px;
+  --frame-border-radius: var(--frame-window-radius, 8px);
   --frame-text-color: hsl(0, 0%, 0%);
 
   &.withBackground {

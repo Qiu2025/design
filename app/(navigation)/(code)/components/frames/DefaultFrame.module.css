@@ -1,5 +1,8 @@
 /* Shared frame styles */
 .frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--frame-background-radius, 16px);
   transition: padding 200ms;
 }
 
@@ -25,7 +28,7 @@
   align-items: stretch;
   padding-top: 10px;
   border: 1px solid hsl(0 0% 100% / 0.3);
-  border-radius: 18px;
+  border-radius: var(--frame-window-radius, 18px);
   background: var(--frame-background);
   transition: all ease 0.3s;
 

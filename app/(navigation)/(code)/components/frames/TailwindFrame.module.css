@@ -7,7 +7,7 @@
   position: relative;
   z-index: 1;
   border: 1px solid color(display-p3 0.8235 0.9451 1 / 0.25);
-  border-radius: 8px;
+  border-radius: var(--frame-window-radius, 8px);
   background: color(display-p3 0.1176 0.1608 0.2314);
 }
 

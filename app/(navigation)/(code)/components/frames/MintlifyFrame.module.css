@@ -5,7 +5,7 @@
 .window {
   position: relative;
   z-index: 1;
-  border-radius: 12px;
+  border-radius: var(--frame-window-radius, 12px);
   background: #070a08;
   box-shadow:
     0px 173px 48px 0px rgba(0, 0, 0, 0),
@@ -22,8 +22,8 @@
   justify-content: space-between;
   border-bottom: 1px solid #141818;
   background: #010201;
-  border-top-left-radius: 12px;
-  border-top-right-radius: 12px;
+  border-top-left-radius: max(0px, calc(var(--frame-window-radius, 12px)));
+  border-top-right-radius: max(0px, calc(var(--frame-window-radius, 12px)));
   gap: 12px;
 }
 

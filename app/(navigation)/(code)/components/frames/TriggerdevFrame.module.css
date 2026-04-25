@@ -79,8 +79,8 @@
   justify-content: space-between;
   padding: 0 16px;
   background: #16181d;
-  border-top-left-radius: 8px;
-  border-top-right-radius: 8px;
+  border-top-left-radius: var(--frame-window-radius, 8px);
+  border-top-right-radius: var(--frame-window-radius, 8px);
   gap: 12px;
 }
 

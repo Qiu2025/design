@@ -88,8 +88,8 @@ export function Navigation() {
                     className={cn("rounded-lg px-2 py-2.5 text-gray-12 focus:bg-gray-a2", isActive && "bg-gray-a2")}
                   >
                     <Link href={link.href} aria-current={isActive ? "page" : undefined}>
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-a3 text-gray-12">
-                        <link.icon className="h-4 w-4" />
+                      <div className="flex shrink-0 items-center justify-center text-gray-12">
+                        <link.icon className="h-5 w-5" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">

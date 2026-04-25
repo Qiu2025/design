@@ -1,8 +1,11 @@
 import { useAtom, useAtomValue } from "jotai";
 import { useContext } from "react";
+import type { CSSProperties } from "react";
 
 import { THEMES, themeAtom, themeDarkModeAtom } from "../store/themes";
 import { FrameContext } from "../store/FrameContextStore";
+import { backgroundRadiusAtom } from "../store/background-radius";
+import { frameBorderRadiusAtom } from "../store/border-radius";
 
 import FlashMessage from "./FlashMessage";
 import ResizableFrame from "./ResizableFrame";
@@ -30,6 +33,12 @@ const Frame = ({ resize = true }: { resize?: boolean }) => {
   const frameContext = useContext(FrameContext);
   const [theme] = useAtom(themeAtom);
   const darkMode = useAtomValue(themeDarkModeAtom);
+  const frameBorderRadius = useAtomValue(frameBorderRadiusAtom);
+  const backgroundRadius = useAtomValue(backgroundRadiusAtom);
+  const frameStyle = {
+    "--frame-background-radius": `${backgroundRadius}px`,
+    "--frame-window-radius": `${frameBorderRadius}px`,
+  } as CSSProperties;
 
   function renderFrame() {
     switch (theme.id) {
@@ -74,7 +83,7 @@ const Frame = ({ resize = true }: { resize?: boolean }) => {
   if (!resize) {
     return (
       <div className={styles.frameContainer}>
-        <div className={styles.outerFrame} ref={frameContext} id="frame">
+        <div className={styles.outerFrame} ref={frameContext} id="frame" style={frameStyle}>
           {renderFrame()}
         </div>
       </div>
@@ -85,7 +94,7 @@ const Frame = ({ resize = true }: { resize?: boolean }) => {
     <div className={styles.frameContainer} data-theme={darkMode ? "dark" : "light"}>
       <ResizableFrame>
         <FlashMessage />
-        <div className={styles.outerFrame} ref={frameContext} id="frame">
+        <div className={styles.outerFrame} ref={frameContext} id="frame" style={frameStyle}>
           {renderFrame()}
         </div>
       </ResizableFrame>

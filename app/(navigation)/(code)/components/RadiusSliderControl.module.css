@@ -1,0 +1,35 @@
+.range {
+  width: 120px;
+  height: 4px;
+  border-radius: 999px;
+  appearance: none;
+  background: rgba(255, 255, 255, 0.12);
+  outline: none;
+}
+
+.range::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  appearance: none;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
+  cursor: default;
+}
+
+.range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.08);
+  cursor: default;
+}
+
+.range::-moz-range-track {
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}

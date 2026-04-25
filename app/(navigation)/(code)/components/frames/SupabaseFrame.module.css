@@ -6,7 +6,7 @@
 
 .window {
   border: 1px solid #292929;
-  border-radius: 6px;
+  border-radius: var(--frame-window-radius, 6px);
   background: #171717;
 }
 
@@ -18,8 +18,8 @@
   padding: 0 16px;
   border-bottom: 1px solid #292929;
   background: #1f1f1f;
-  border-top-left-radius: 5px;
-  border-top-right-radius: 5px;
+  border-top-left-radius: max(0px, calc(var(--frame-window-radius, 6px) - 1px));
+  border-top-right-radius: max(0px, calc(var(--frame-window-radius, 6px) - 1px));
   gap: 12px;
 }
 
