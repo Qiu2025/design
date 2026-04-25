@@ -40,6 +40,20 @@ const getTagId = (ref: refProps) => {
   return ref ? tagIdsByRef[ref] : undefined;
 };
 
+const createShortLink = async (destinationUrl: string, tagId?: string) => {
+  const link = await dub.links.create({
+    url: destinationUrl,
+    domain: DUB_LINK_DOMAIN,
+    ...(tagId ? { tagIds: [tagId] } : {}),
+  });
+
+  if (!link?.key) {
+    throw new Error("Dub response missing key");
+  }
+
+  return link.key;
+};
+
 const normalizeDestinationUrl = (url: URL) => {
   const isLocalhost =
     url.hostname === "localhost" ||
@@ -80,6 +94,7 @@ export async function GET(req: NextRequest) {
 
   if (
     url.hostname.endsWith(SHORT_LINK_PUBLIC_DOMAIN) ||
+    url.hostname.endsWith(DUB_LINK_DOMAIN) ||
     url.hostname.includes("raycastapp.vercel.app") ||
     url.hostname === "localhost" ||
     url.hostname === "127.0.0.1" ||
@@ -87,19 +102,16 @@ export async function GET(req: NextRequest) {
     url.hostname.startsWith("192.168.")
   ) {
     try {
-      const link = await dub.links.create({
-        url: destinationUrl,
-        domain: DUB_LINK_DOMAIN,
-        ...(tagId ? { tagIds: [tagId] } : {}),
-      });
-      return NextResponse.json({ link: `https://${SHORT_LINK_PUBLIC_DOMAIN}/${link.key}` });
+      const key = await createShortLink(destinationUrl, tagId);
+      return NextResponse.json({ link: `https://${DUB_LINK_DOMAIN}/${key}` });
     } catch {
       // Fallback: if tag IDs are invalid for this Dub workspace, retry without tags.
-      const link = await dub.links.create({
-        url: destinationUrl,
-        domain: DUB_LINK_DOMAIN,
-      });
-      return NextResponse.json({ link: `https://${SHORT_LINK_PUBLIC_DOMAIN}/${link.key}` });
+      try {
+        const key = await createShortLink(destinationUrl);
+        return NextResponse.json({ link: `https://${DUB_LINK_DOMAIN}/${key}` });
+      } catch {
+        return NextResponse.json({ error: "Unable to shorten this link" }, { status: 500 });
+      }
     }
   }
 

@@ -281,6 +281,20 @@ export const IconGenerator = () => {
   const searchParams = useSearchParams();
   const searchTerm = searchParams.get("q") || "";
 
+  const booleanSettingKeys = new Set(["backgroundRadialGlare", "backgroundNoiseTexture"]);
+  const numberSettingKeys = new Set([
+    "backgroundRadius",
+    "backgroundStrokeSize",
+    "backgroundNoiseTextureOpacity",
+    "backgroundStrokeOpacity",
+    "backgroundSpread",
+    "backgroundAngle",
+    "iconSize",
+    "iconOffsetX",
+    "iconOffsetY",
+    "selectedPresetIndex",
+  ]);
+
   const [scale, setScale] = useState<number>(() =>
     typeof window !== "undefined" && window.innerWidth < 512 ? window.innerWidth / 512 - 0.03125 * 2 : 1,
   );
@@ -313,10 +327,17 @@ export const IconGenerator = () => {
       const rawValue = searchParams.get(key);
       if (rawValue === null) return acc;
 
-      let value: string | boolean | number | undefined = rawValue;
+      let value: string | boolean | number | null | undefined = rawValue;
       if (value === "undefined") value = undefined;
-      if (key === "backgroundRadialGlare" || key === "backgroundNoiseTexture") {
+      if (value === "null") value = null;
+
+      if (booleanSettingKeys.has(key)) {
         value = value === "true" || value === "1";
+      } else if (numberSettingKeys.has(key) && value !== undefined && value !== null) {
+        const parsedValue = Number(value);
+        if (!Number.isNaN(parsedValue)) {
+          value = parsedValue;
+        }
       }
 
       return {
@@ -432,14 +453,23 @@ export const IconGenerator = () => {
     }
   }, []);
 
-  const onCopyShareUrl = async () => {
-    showInfoMessage("Copying URL to clipboard…", false);
+  const buildShareUrl = useCallback(() => {
     const shareUrl = new URL("/icon", globalThis.window.location.origin);
+
     Object.entries(settings).forEach(([key, value]) => {
+      if (value === undefined) {
+        return;
+      }
+
       shareUrl.searchParams.set(key, String(value));
     });
 
-    let urlToCopy = shareUrl.toString();
+    return shareUrl.toString();
+  }, [settings]);
+
+  const onCopyShareUrl = async () => {
+    showInfoMessage("Copying URL to clipboard…", false);
+    let urlToCopy = buildShareUrl();
     const encodedUrl = encodeURIComponent(urlToCopy);
     const response = await fetch(`/api/shorten-url?url=${encodedUrl}&ref=icons`).then((res) => res.json());
 
@@ -754,7 +784,7 @@ export const IconGenerator = () => {
 
   const onShare = async () => {
     try {
-      const url = window.location.href.split("?")[0] + "?" + new URLSearchParams(settings as any).toString();
+      const url = buildShareUrl();
       await navigator.share({
         title: "Raycast Icon",
         url,
