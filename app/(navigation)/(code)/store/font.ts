@@ -1,4 +1,4 @@
-import { atomWithHash } from "jotai-location";
+import { atomWithCodeImagesHash } from "../util/shareState";
 
 export const FONTS = [
   "jetbrains-mono",
@@ -15,6 +15,6 @@ export const FONTS = [
 
 export type Font = (typeof FONTS)[number];
 
-const fontAtom = atomWithHash<Font>("font", FONTS[0]);
+const fontAtom = atomWithCodeImagesHash<Font>("font", FONTS[0]);
 
 export { fontAtom };

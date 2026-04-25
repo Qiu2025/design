@@ -35,6 +35,7 @@ import {
 } from "@/components/dropdown-menu";
 import { DownloadIcon } from "@raycast/icons";
 import { Kbd, Kbds } from "@/components/kbd";
+import { getCodeImagesHashState, getCodeImagesShareUrl } from "../util/shareState";
 
 const ExportButton: React.FC = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -70,18 +71,16 @@ const ExportButton: React.FC = () => {
       throw new Error("Couldn't find a frame to export");
     }
 
-    const clipboardItem = new ClipboardItem(
-      {
-        "image/png": toBlob(frameContext.current, {
-          pixelRatio: exportSize,
-        }).then((blob) => {
-            if (!blob) {
-              throw new Error("expected toBlob to return a blob");
-            }
-            return blob;
-        }),
-      }
-    );
+    const clipboardItem = new ClipboardItem({
+      "image/png": toBlob(frameContext.current, {
+        pixelRatio: exportSize,
+      }).then((blob) => {
+        if (!blob) {
+          throw new Error("expected toBlob to return a blob");
+        }
+        return blob;
+      }),
+    });
 
     await navigator.clipboard.write([clipboardItem]);
 
@@ -112,7 +111,7 @@ const ExportButton: React.FC = () => {
   const handleExportClick: MouseEventHandler = (event) => {
     event.preventDefault();
 
-    const params = new URLSearchParams(window.location.hash.replace("#", "?"));
+    const params = new URLSearchParams(getCodeImagesHashState().replace("#", "?"));
     track("Export", {
       theme: params.get("theme") || "candy",
       background: params.get("background") || "true",
@@ -130,7 +129,7 @@ const ExportButton: React.FC = () => {
   const copyUrl = async () => {
     setFlashMessage({ icon: <ClipboardIcon />, message: "Copying URL" });
 
-    const url = window.location.toString();
+    const url = getCodeImagesShareUrl();
     let urlToCopy = url;
 
     const encodedUrl = encodeURIComponent(url);
@@ -144,11 +143,6 @@ const ExportButton: React.FC = () => {
 
     setFlashMessage({ icon: <ClipboardIcon />, message: "URL Copied to clipboard!", timeout: 2000 });
   };
-
-  useHotkeys("ctrl+k,cmd+k", (event) => {
-    event.preventDefault();
-    setDropdownOpen((open) => !open);
-  });
 
   useHotkeys("ctrl+s,cmd+s", (event) => {
     event.preventDefault();

@@ -1,8 +1,8 @@
 import { atom } from "jotai";
 import { Base64 } from "js-base64";
 import hljs from "highlight.js";
-import { atomWithHash } from "jotai-location";
 import { LANGUAGES, Language } from "../util/languages";
+import { atomWithCodeImagesHash, getCodeImagesHashState, setCodeImagesHashState } from "../util/shareState";
 
 type CodeSample = {
   language: Language;
@@ -66,7 +66,7 @@ export const autoDetectLanguageAtom = atom<boolean>((get) => {
 });
 
 const detectedLanguageAtom = atom<Language | null>(null);
-const userInputtedLanguageAtom = atomWithHash<Language | null>("language", null, {
+const userInputtedLanguageAtom = atomWithCodeImagesHash<Language | null>("language", null, {
   serialize(language) {
     const key = Object.keys(LANGUAGES).find((key) => LANGUAGES[key] === language);
 
@@ -105,14 +105,14 @@ export const selectedLanguageAtom = atom(
 
 export const codeExampleAtom = atom<CodeSample | null>(CODE_SAMPLES[Math.floor(Math.random() * CODE_SAMPLES.length)]);
 
-export const isCodeExampleAtom = atom<boolean>(
-  (get) => !!CODE_SAMPLES.find((codeSample) => codeSample.code === get(codeAtom)),
+export const isCodeExampleAtom = atom<boolean>((get) =>
+  CODE_SAMPLES.some((codeSample) => codeSample.code === get(codeAtom)),
 );
 
-const isSSR = () => typeof window === "undefined";
+const isSSR = () => globalThis.window === undefined;
 
 function getUserInputtedCodeFromHash() {
-  const searchParams = new URLSearchParams(location.hash.slice(1));
+  const searchParams = new URLSearchParams(getCodeImagesHashState().slice(1));
   const searchParamsCode = searchParams.get("code");
 
   if (typeof searchParamsCode === "string") {
@@ -141,11 +141,11 @@ export const userInputtedCodeAtom = atom<string | null>(getInitialUserInputtedCo
 export const codeAtom = atom(
   (get) => get(userInputtedCodeAtom) ?? get(codeExampleAtom)?.code ?? "",
   (get, set, newCode: string) => {
-    const searchParams = new URLSearchParams(location.hash.slice(1));
+    const searchParams = new URLSearchParams(getCodeImagesHashState().slice(1));
     set(userInputtedCodeAtom, newCode);
 
     searchParams.set("code", Base64.encodeURI(newCode));
-    window.location.hash = `#${searchParams.toString()}`;
+    setCodeImagesHashState(`#${searchParams.toString()}`);
 
     detectLanguage(newCode).then((language) => {
       if (LANGUAGES[language]) {

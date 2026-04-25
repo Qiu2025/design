@@ -16,6 +16,7 @@ const FormatButton: React.FC = () => {
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsClient(true);
   }, []);
 
@@ -53,7 +54,7 @@ const FormatButton: React.FC = () => {
     );
   };
 
-  useHotkeys("shift+option+f", (event) => {
+  useHotkeys("ctrl+f,cmd+f", (event) => {
     event.preventDefault();
     handleFormatCode();
   });

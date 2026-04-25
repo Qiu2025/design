@@ -590,8 +590,11 @@ export const IconGenerator = () => {
   useHotkeys("ctrl+0,cmd+0", () => setScale(1));
   useHotkeys("ctrl+.,cmd+.", () => setPanelsVisible((panelsVisible) => !panelsVisible));
   useHotkeys("ctrl+z,cmd+z", () => undo());
-  useHotkeys("ctrl+shift+z,cmd+shift+z", () => redo());
-  useHotkeys("ctrl+shift+e,cmd+shift+e", () => setShowExportModal(true));
+  useHotkeys("ctrl+y,cmd+shift+z", () => redo());
+  useHotkeys("ctrl+s,cmd+s", (event) => {
+    event.preventDefault();
+    setShowExportModal(true);
+  });
   useHotkeys("ctrl+shift+c,cmd+shift+c", () => onCopyShareUrl() as any);
   useHotkeys("ctrl+c,cmd+c", () => onCopyImageToClipboard() as any);
   useHotkeys("ctrl+f,cmd+f", (e) => {
@@ -600,8 +603,6 @@ export const IconGenerator = () => {
       searchRef.current.focus();
     }
   });
-  useHotkeys("ctrl+k,cmd+k", () => setExportDropdownOpen((opened) => !opened));
-
   const onWheel = useCallback((event: WheelEvent) => {
     if (event.ctrlKey || event.metaKey) {
       setScale((currentScale) => currentScale + 0.0001 * event.deltaY);
@@ -660,17 +661,23 @@ export const IconGenerator = () => {
     router.replace(`?q=${newSeachTerm}`);
   };
 
-  const onFileNameBlured = (event: React.ChangeEvent<HTMLDivElement>) => {
+  const onFileNameBlured = (event: React.FocusEvent<HTMLInputElement>) => {
     pushNewSettings({
-      fileName: (event.currentTarget as HTMLDivElement).textContent || "extension_name",
+      fileName: event.currentTarget.value.trim() || "extension_icon",
     });
   };
-  const onFileNameKeydown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+  const onFileNameChanged = (event: React.ChangeEvent<HTMLInputElement>) => {
+    pushNewSettings({
+      fileName: event.currentTarget.value,
+    });
+  };
+
+  const onFileNameKeydown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") {
       event.preventDefault();
       event.currentTarget.blur();
       pushNewSettings({
-        fileName: (event.currentTarget as HTMLDivElement).textContent || "",
+        fileName: event.currentTarget.value.trim() || "extension_icon",
       });
     }
   };
@@ -826,13 +833,12 @@ export const IconGenerator = () => {
         </div>
       </CSSTransition>
       <NavigationActions>
-        <div className={styles.separator} />
         <div className={cn(styles.actions, styles.actionsLeft)}>
           <Button
             variant="transparent"
             className={styles.undoButton}
             disabled={history.length <= 1}
-            title={`cmd+z`}
+            title="Ctrl+Z"
             onClick={undo}
           >
             <UndoIcon />
@@ -843,21 +849,26 @@ export const IconGenerator = () => {
             variant="transparent"
             className={styles.redoButton}
             disabled={redoHistory.length === 0}
-            title={`shift+cmd+z`}
+            title="Ctrl+Y"
             onClick={redo}
           >
             <RedoIcon />
             <span className={styles.label}>Redo</span>
           </Button>
+          <div className={styles.separator} />
         </div>
-        <div
-          className={styles.filename}
-          contentEditable
-          suppressContentEditableWarning
-          onBlur={onFileNameBlured}
-          onKeyDown={onFileNameKeydown}
-        >
-          {settings.fileName}
+        <div className={styles.filename}>
+          <input
+            type="text"
+            className={styles.filenameInput}
+            aria-label="Icon file name"
+            value={settings.fileName}
+            placeholder="extension_icon"
+            onChange={onFileNameChanged}
+            onBlur={onFileNameBlured}
+            onKeyDown={onFileNameKeydown}
+          />
+          <span className={styles.filenameExtension}>.png</span>
         </div>
         <div className={cn(styles.actions, styles.actionsRight)}>
           <div className="flex gap-2 sm:hidden">
@@ -883,8 +894,7 @@ export const IconGenerator = () => {
                     <ImageIcon /> Download
                     <Kbds>
                       <Kbd>⌘</Kbd>
-                      <Kbd>⇧</Kbd>
-                      <Kbd>E</Kbd>
+                      <Kbd>S</Kbd>
                     </Kbds>
                   </DropdownMenuItem>
                   {pngClipboardSupported && (

@@ -1,8 +1,8 @@
 import { atom } from "jotai";
-import { atomWithHash } from "jotai-location";
 import { atomWithStorage } from "jotai/utils";
 import { CSSProperties } from "react";
 import { Font } from "./font";
+import { atomWithCodeImagesHash } from "../util/shareState";
 import FirecrawlLogo from "../assets/firecrawl/logo.svg";
 import FirecrawlLogoUrl from "../assets/firecrawl/logo.svg?url";
 import CloudflareLogo from "../assets/cloudflare.svg";
@@ -1550,10 +1550,10 @@ export const THEMES: { [index: string]: Theme } = {
   },
 };
 
-const themeAtom = atomWithHash<Theme>(
+const themeAtom = atomWithCodeImagesHash<Theme>(
   "theme",
   (() => {
-    if (typeof window !== "undefined") {
+    if (globalThis.window !== undefined) {
       try {
         // Check if theme is stored in localStorage
         const codeTheme = localStorage.getItem("codeTheme");
@@ -1585,7 +1585,7 @@ const themeAtom = atomWithHash<Theme>(
   },
 );
 
-const darkModeAtom = atomWithHash<boolean>("darkMode", true);
+const darkModeAtom = atomWithCodeImagesHash<boolean>("darkMode", true);
 
 const themeDarkModeAtom = atom<boolean>((get) => {
   const theme = get(themeAtom);

@@ -6,7 +6,6 @@ import { Language, LANGUAGES } from "../util/languages";
 
 import styles from "./LanguageControl.module.css";
 
-import useHotkeys from "../../../../utils/useHotkeys";
 import { loadingLanguageAtom } from "../store";
 import {
   Combobox,
@@ -50,10 +49,6 @@ const LanguageControl: React.FC = () => {
     if (!selectedLanguage) return AUTO_DETECT_ITEM;
     return items.find((item) => item.language?.name === selectedLanguage.name) ?? AUTO_DETECT_ITEM;
   }, [selectedLanguage, items]);
-
-  useHotkeys("l", (event) => {
-    event.preventDefault();
-  });
 
   return (
     <ControlContainer title="Language">

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import getWasm from "shiki/wasm";
 import { highlighterAtom } from "./store";
 import { useAtom } from "jotai";
@@ -22,9 +22,15 @@ import ExportButton from "./components/ExportButton";
 import { NavigationActions } from "@/components/navigation";
 import { InfoDialog } from "./components/InfoDialog";
 import FormatButton from "./components/FormatCodeButton";
+import { setCodeImagesHashState } from "./util/shareState";
 
 export function Code() {
   const [highlighter, setHighlighter] = useAtom(highlighterAtom);
+
+  useLayoutEffect(() => {
+    const initialHash = globalThis.window.location.hash;
+    setCodeImagesHashState(initialHash);
+  }, []);
 
   useEffect(() => {
     getHighlighterCore({
@@ -37,20 +43,18 @@ export function Code() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <>
-      <FrameContextStore>
-        <NavigationActions>
-          <InfoDialog />
-          <FormatButton />
-          <ExportButton />
-        </NavigationActions>
-        <div className={styles.app}>
-          <NoSSR>
-            {highlighter && <Frame />}
-            <Controls />
-          </NoSSR>
-        </div>
-      </FrameContextStore>
-    </>
+    <FrameContextStore>
+      <NavigationActions>
+        <InfoDialog />
+        <FormatButton />
+        <ExportButton />
+      </NavigationActions>
+      <div className={styles.app}>
+        <NoSSR>
+          {highlighter && <Frame />}
+          <Controls />
+        </NoSSR>
+      </div>
+    </FrameContextStore>
   );
 }

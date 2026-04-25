@@ -1,14 +1,14 @@
 import { atom } from "jotai";
-import { atomWithHash } from "jotai-location";
+import { atomWithCodeImagesHash } from "../util/shareState";
 import type { Highlighter } from "shiki";
 
-export const windowWidthAtom = atomWithHash<number | null>("width", null);
+export const windowWidthAtom = atomWithCodeImagesHash<number | null>("width", null);
 
-export const showBackgroundAtom = atomWithHash<boolean>("background", true);
+export const showBackgroundAtom = atomWithCodeImagesHash<boolean>("background", true);
 
-export const showLineNumbersAtom = atomWithHash<boolean | undefined>("lineNumbers", undefined);
+export const showLineNumbersAtom = atomWithCodeImagesHash<boolean | undefined>("lineNumbers", undefined);
 
-export const fileNameAtom = atomWithHash<string>("title", "", {
+export const fileNameAtom = atomWithCodeImagesHash<string>("title", "", {
   serialize(val) {
     return val;
   },
@@ -21,7 +21,7 @@ export const highlighterAtom = atom<Highlighter | null>(null);
 
 export const loadingLanguageAtom = atom<boolean>(false);
 
-export const highlightedLinesAtom = atomWithHash<number[]>("highlightedLines", [], {
+export const highlightedLinesAtom = atomWithCodeImagesHash<number[]>("highlightedLines", [], {
   serialize(val) {
     return val.join(",");
   },

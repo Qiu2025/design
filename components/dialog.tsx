@@ -19,10 +19,7 @@ const DialogOverlay = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Overlay
     ref={ref}
-    className={cn(
-      "bg-black/60 fixed inset-0 z-50 data-[state=open]:animate-overlayShow overflow-y-auto grid place-items-center",
-      className,
-    )}
+    className={cn("bg-black/60 fixed inset-0 z-50 overflow-y-auto grid place-items-center", className)}
     {...props}
   />
 ));
@@ -40,7 +37,6 @@ const DialogContent = React.forwardRef<React.ElementRef<typeof DialogPrimitive.C
           ref={ref}
           className={cn(
             `grid w-full gap-4 rounded-md bg-panel border border-gray-a3 shadow-md duration-200 
-        data-[state=open]:animate-contentShow 
         sm:rounded-lg my-10 relative`,
             size === "small" && "max-w-xs p-8",
             size === "medium" && "max-w-lg p-6",
