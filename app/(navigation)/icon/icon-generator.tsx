@@ -60,6 +60,7 @@ import { ScrollArea } from "@/components/scroll-area";
 const scales = [0.25, 0.5, 1, 2];
 
 const FEEDBACK_EMAIL = "feedback+rayso@raycast.com";
+const DEFAULT_ICON_FILE_NAME = "untitled-icon";
 
 type PresetType = Pick<
   SettingsType,
@@ -302,7 +303,7 @@ export const IconGenerator = () => {
     const defaultPresetIndex = 0;
     const defaultIcon = (Object.keys(Icons)[0] || "Dots") as IconName;
     const baseSettings: SettingsType = {
-      fileName: "extension_icon",
+      fileName: DEFAULT_ICON_FILE_NAME,
       icon: defaultIcon,
       backgroundRadius: 128,
       backgroundStrokeSize: 0,
@@ -663,13 +664,22 @@ export const IconGenerator = () => {
 
   const onFileNameBlured = (event: React.FocusEvent<HTMLInputElement>) => {
     pushNewSettings({
-      fileName: event.currentTarget.value.trim() || "extension_icon",
+      fileName: event.currentTarget.value.trim() || DEFAULT_ICON_FILE_NAME,
     });
   };
+
   const onFileNameChanged = (event: React.ChangeEvent<HTMLInputElement>) => {
     pushNewSettings({
       fileName: event.currentTarget.value,
     });
+  };
+
+  const onFileNameFocused = (event: React.FocusEvent<HTMLInputElement>) => {
+    if (event.currentTarget.value === DEFAULT_ICON_FILE_NAME) {
+      pushNewSettings({
+        fileName: "",
+      });
+    }
   };
 
   const onFileNameKeydown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -677,7 +687,7 @@ export const IconGenerator = () => {
       event.preventDefault();
       event.currentTarget.blur();
       pushNewSettings({
-        fileName: event.currentTarget.value.trim() || "extension_icon",
+        fileName: event.currentTarget.value.trim() || DEFAULT_ICON_FILE_NAME,
       });
     }
   };
@@ -855,20 +865,23 @@ export const IconGenerator = () => {
             <RedoIcon />
             <span className={styles.label}>Redo</span>
           </Button>
-          <div className={styles.separator} />
         </div>
         <div className={styles.filename}>
-          <input
-            type="text"
-            className={styles.filenameInput}
-            aria-label="Icon file name"
-            value={settings.fileName}
-            placeholder="extension_icon"
-            onChange={onFileNameChanged}
-            onBlur={onFileNameBlured}
-            onKeyDown={onFileNameKeydown}
-          />
-          <span className={styles.filenameExtension}>.png</span>
+          <div className={styles.filenameInner}>
+            <input
+              type="text"
+              size={Math.max(settings.fileName.length, DEFAULT_ICON_FILE_NAME.length, 1)}
+              className={styles.filenameInput}
+              aria-label="Icon file name"
+              value={settings.fileName}
+              placeholder={DEFAULT_ICON_FILE_NAME}
+              onChange={onFileNameChanged}
+              onFocus={onFileNameFocused}
+              onBlur={onFileNameBlured}
+              onKeyDown={onFileNameKeydown}
+            />
+            <span className={styles.filenameExtension}>.png</span>
+          </div>
         </div>
         <div className={cn(styles.actions, styles.actionsRight)}>
           <div className="flex gap-2 sm:hidden">

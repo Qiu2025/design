@@ -3,12 +3,24 @@
 import { useSelectedLayoutSegments } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { ChevronLeftIcon } from "@raycast/icons";
+import { CheckIcon, ChevronDownIcon, ChevronLeftIcon } from "@raycast/icons";
 import Link from "next/link";
 import { cn } from "@/utils/cn";
 import CodeImagesIcon from "@/app/assets/code-images.svg";
 import IconMakerIcon from "@/app/assets/icon-maker.svg";
 import { Button } from "./button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "./dropdown-menu";
+
+const NAVIGATION_SIDE_PADDING = 16;
+const NAVIGATION_WIDTH = 204;
+const NAVIGATION_GAP = 16;
+const NAVIGATION_ACTIONS_LEFT = NAVIGATION_SIDE_PADDING + NAVIGATION_WIDTH + NAVIGATION_GAP;
 
 const links = [
   {
@@ -30,47 +42,70 @@ export function Navigation() {
   const segment = segments[0] || "(code)";
   const showBackButton = segments.includes("shared") ? segments.length > 1 : segments.length > 2;
   const backHref = segment === "icon" ? "/icon" : "/";
+  const activeLink = links.find((link) => (link.href === "/" ? segment === "(code)" : segment === "icon")) ?? links[0];
 
   return (
     <nav className="flex items-center gap-3 h-[50px] pl-4 pr-5 bg-gray-2 text-white w-full fixed z-10">
-      <div
-        className={cn(
-          "flex items-center gap-3 transition-transform ease-in-out",
-          showBackButton ? "translate-x-0" : "-translate-x-10",
-        )}
-      >
+      <div className="relative flex items-center" style={{ width: NAVIGATION_WIDTH, minWidth: NAVIGATION_WIDTH }}>
         <Button
           asChild
           className={cn(
-            "rounded-full shadow-none w-6 h-6 bg-gray-4 hover:bg-gray-5 text-gray-12",
-            showBackButton ? "opacity-100 scale-100" : "opacity-0 scale-75",
+            "absolute left-0 rounded-full shadow-none w-6 h-6 shrink-0 bg-gray-4 hover:bg-gray-5 text-gray-12 transition-all",
+            showBackButton ? "opacity-100 scale-100" : "pointer-events-none opacity-0 scale-75",
           )}
         >
           <Link href={backHref} aria-label="Home" aria-disabled={!showBackButton} tabIndex={showBackButton ? 0 : -1}>
             <ChevronLeftIcon className="w-4 h-4 shrink-0" />
           </Link>
         </Button>
-        <div className="flex items-center gap-1 bg-gray-3/80 rounded-md p-1">
-          {links.map((link) => {
-            const isActive = link.href === "/" ? segment === "(code)" : segment === "icon";
-
-            return (
+        <div className="min-w-0 flex-1" style={{ paddingLeft: showBackButton ? 36 : 0 }}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
               <Button
-                key={link.href}
-                asChild
                 variant="transparent"
-                className={cn(
-                  "px-2.5 py-1.5 gap-2 text-gray-11 hover:text-gray-12",
-                  isActive && "bg-gray-4 text-gray-12 hover:bg-gray-4",
-                )}
+                className="h-8 min-w-0 w-full justify-between gap-2 rounded-full border border-gray-a3 bg-gray-a2/60 px-2.5 text-gray-12 shadow-[inset_0_1px_0_hsla(0,0%,100%,0.035)] hover:bg-gray-a3"
               >
-                <Link href={link.href} aria-current={isActive ? "page" : undefined}>
-                  {link.icon && <link.icon className="w-5 h-5" />}
-                  <span className="text-[14px] font-medium hidden sm:inline">{link.label}</span>
-                </Link>
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-12">
+                    <activeLink.icon className="h-4 w-4" />
+                  </div>
+                  <span className="truncate text-sm font-medium">{activeLink.label}</span>
+                </div>
+                <ChevronDownIcon className="h-4 w-4 shrink-0 text-gray-11" />
               </Button>
-            );
-          })}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-[min(20rem,calc(100vw-2rem))] rounded-xl p-2">
+              <DropdownMenuLabel className="px-2 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-9">
+                Switch Tool
+              </DropdownMenuLabel>
+              {links.map((link) => {
+                const isActive = link.href === "/" ? segment === "(code)" : segment === "icon";
+
+                return (
+                  <DropdownMenuItem
+                    key={link.href}
+                    asChild
+                    className={cn("rounded-lg px-2 py-2.5 text-gray-12 focus:bg-gray-a2", isActive && "bg-gray-a2")}
+                  >
+                    <Link href={link.href} aria-current={isActive ? "page" : undefined}>
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-a3 text-gray-12">
+                        <link.icon className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate text-sm font-medium">{link.label}</span>
+                        </div>
+                        <p className="truncate text-xs text-gray-10">{link.description}</p>
+                      </div>
+                      <div className="ml-2 flex w-4 justify-center text-gray-11">
+                        {isActive && <CheckIcon className="h-4 w-4" />}
+                      </div>
+                    </Link>
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </nav>
@@ -80,10 +115,8 @@ export function Navigation() {
 export function NavigationActions({ children, className }: Readonly<{ children: ReactNode; className?: string }>) {
   return (
     <div
-      className={cn(
-        "h-[50px] flex items-center justify-end fixed top-0 right-scrollbar-offset gap-2 z-10 left-[275px]",
-        className,
-      )}
+      className={cn("h-[50px] flex items-center justify-end fixed top-0 right-scrollbar-offset gap-2 z-10", className)}
+      style={{ left: NAVIGATION_ACTIONS_LEFT }}
     >
       {children}
     </div>
