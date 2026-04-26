@@ -1,5 +1,5 @@
 <h1 align="center">
-  SnapKit
+  SnapBox
 </h1>
 <p align="center">
   Create beautiful code images and icons.
