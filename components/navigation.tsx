@@ -8,6 +8,7 @@ import Link from "next/link";
 import { cn } from "@/utils/cn";
 import CodeImagesIcon from "@/app/assets/code-images.svg";
 import IconMakerIcon from "@/app/assets/icon-maker.svg";
+import MetadataRemoverIcon from "@/app/assets/metadata-remover.svg";
 import { Button } from "./button";
 import {
   DropdownMenu,
@@ -35,14 +36,27 @@ const links = [
     description: "Create beautiful icons",
     icon: IconMakerIcon,
   },
+  {
+    href: "/metadata",
+    label: "Metadata Remover",
+    description: "Remove metadata from images and videos",
+    icon: MetadataRemoverIcon,
+  },
 ];
 
 export function Navigation() {
   const segments = useSelectedLayoutSegments();
   const segment = segments[0] || "(code)";
   const showBackButton = segments.includes("shared") ? segments.length > 1 : segments.length > 2;
-  const backHref = segment === "icon" ? "/icon" : "/";
-  const activeLink = links.find((link) => (link.href === "/" ? segment === "(code)" : segment === "icon")) ?? links[0];
+  const backHref = segment === "icon" ? "/icon" : segment === "metadata" ? "/metadata" : "/";
+  const activeLink =
+    links.find((link) => {
+      if (link.href === "/") {
+        return segment === "(code)";
+      }
+
+      return segment === link.href.slice(1);
+    }) ?? links[0];
 
   return (
     <nav className="flex items-center gap-3 h-[50px] pl-4 pr-5 bg-gray-2 text-white w-full fixed z-10">
@@ -79,7 +93,7 @@ export function Navigation() {
                 Switch Tool
               </DropdownMenuLabel>
               {links.map((link) => {
-                const isActive = link.href === "/" ? segment === "(code)" : segment === "icon";
+                const isActive = link.href === "/" ? segment === "(code)" : segment === link.href.slice(1);
 
                 return (
                   <DropdownMenuItem
