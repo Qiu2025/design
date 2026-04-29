@@ -5,9 +5,11 @@ import React, { use, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import cn from "classnames";
-import { toPng as htmlToPng } from "html-to-image";
 import { CSSTransition } from "react-transition-group";
-import { ColorChangeHandler, SketchPicker } from "react-color";
+import { ColorChangeHandler } from "react-color";
+import dynamic from "next/dynamic";
+
+const SketchPicker = dynamic(() => import("react-color").then((mod) => mod.SketchPicker), { ssr: false });
 import * as Popover from "@radix-ui/react-popover";
 
 import DropZoneIndicator from "./assets/drop-zone-indicator.svg";
@@ -431,6 +433,7 @@ export const IconGenerator = () => {
   };
 
   const onRandomIconClick = () => {
+    setShowTextIconInput(false);
     pushNewSettings({
       icon: randomElement(Object.keys(Icons) as IconName[]),
       customSvg: undefined,
@@ -442,7 +445,8 @@ export const IconGenerator = () => {
       // Fixes @2x png export instead of the same size as png
       const realPixelRatio = window.devicePixelRatio;
       window.devicePixelRatio = 1;
-      const dataUri = await htmlToPng(svgRef.current, { pixelRatio: 1, width: 512, height: 512 });
+      const { toPng } = await import("html-to-image");
+      const dataUri = await toPng(svgRef.current, { pixelRatio: 1, width: 512, height: 512 });
       const blob = await (await fetch(dataUri)).blob();
       await navigator.clipboard.write([
         new ClipboardItem({
@@ -494,6 +498,7 @@ export const IconGenerator = () => {
         const customSvg = await file.text();
         if (customSvg) {
           showInfoMessage("Image pasted to canvas", true);
+          setShowTextIconInput(false);
           pushNewSettings({
             customSvg,
             icon: undefined,
@@ -506,6 +511,7 @@ export const IconGenerator = () => {
         reader.onload = () => {
           const customPng = reader.result as string;
           showInfoMessage("Image pasted to canvas", true);
+          setShowTextIconInput(false);
           pushNewSettings({
             customSvg: customPng,
             icon: undefined,
@@ -517,6 +523,11 @@ export const IconGenerator = () => {
         reader.readAsDataURL(file);
       } else {
         showInfoMessage("We don't support that file format. Try dropping an .SVG or .PNG file instead.", false);
+      }
+
+      // Clear file input so the same file can be selected again
+      if (event.target.type === "file") {
+        event.target.value = "";
       }
     } else if (event && event.target.value && showTextIconInput) {
       const customText = "data:text/plaintext=" + event.target.value;
