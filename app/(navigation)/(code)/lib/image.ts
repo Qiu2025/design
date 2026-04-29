@@ -1,5 +1,3 @@
-import { toPng as htmlToPng, toSvg as htmlToSvg, toBlob as htmlToBlob } from "html-to-image";
-
 const imageFilter = (node: HTMLElement) => node.tagName !== "TEXTAREA" && !node.dataset?.ignoreInExport;
 
 const htmlToImageOptions = {
@@ -8,8 +6,10 @@ const htmlToImageOptions = {
   skipAutoScale: true,
 };
 
-type PngOptions = Parameters<typeof htmlToPng>[1];
-export const toPng = async (node: HTMLElement, options?: PngOptions) => {
+type Options = { filter?: (node: HTMLElement) => boolean; pixelRatio?: number; skipAutoScale?: boolean; style?: any };
+
+export const toPng = async (node: HTMLElement, options?: Options) => {
+  const { toPng: htmlToPng } = await import("html-to-image");
   // sometimes the first render doesn't work fully so we do the rendering twice https://github.com/bubkoo/html-to-image/issues/361
   await htmlToPng(node, {
     ...htmlToImageOptions,
@@ -21,16 +21,16 @@ export const toPng = async (node: HTMLElement, options?: PngOptions) => {
   });
 };
 
-type BlobOptions = Parameters<typeof htmlToBlob>[1];
-export const toBlob = async (node: HTMLElement, options?: BlobOptions) => {
+export const toBlob = async (node: HTMLElement, options?: Options) => {
+  const { toBlob: htmlToBlob } = await import("html-to-image");
   return htmlToBlob(node, {
     ...htmlToImageOptions,
     ...options,
   });
 };
 
-type SvgOptions = Parameters<typeof htmlToSvg>[1];
-export const toSvg = async (node: HTMLElement, options?: SvgOptions) => {
+export const toSvg = async (node: HTMLElement, options?: Options) => {
+  const { toSvg: htmlToSvg } = await import("html-to-image");
   return htmlToSvg(node, {
     ...htmlToImageOptions,
     ...options,
