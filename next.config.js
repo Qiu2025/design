@@ -12,12 +12,7 @@ const nextConfig = {
     optimizePackageImports: ["shiki"],
   },
   images: {
-    remotePatterns: [
-      {
-        hostname: "files.raycast.com",
-        protocol: "https",
-      },
-    ],
+    remotePatterns: [],
   },
   turbopack: {
     rules: {

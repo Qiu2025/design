@@ -66,6 +66,7 @@ function ExportModal({ open, onOpenChange, onStartExport, fileName, svgRef }: Ex
 
   // Update export options when fileName changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setExportOptions((prevOptions) =>
       prevOptions.map((option, index) => {
         if (index === 0) {

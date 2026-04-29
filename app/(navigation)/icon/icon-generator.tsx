@@ -803,7 +803,7 @@ export const IconGenerator = () => {
     try {
       const url = buildShareUrl();
       await navigator.share({
-        title: "Raycast Icon",
+        title: "SnapBox Icon",
         url,
       });
     } catch (err) {

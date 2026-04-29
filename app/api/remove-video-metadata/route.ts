@@ -8,7 +8,7 @@ import { getOutputFileName, isSupportedVideoExtension, isSupportedVideoType, MAX
 
 export const runtime = "nodejs";
 
-const TEMP_DIRECTORY = join(tmpdir(), "ray-so-metadata-remover");
+const TEMP_DIRECTORY = join(tmpdir(), "snapbox-metadata-remover");
 
 /** Maximum time in ms before ffmpeg is killed. */
 const FFMPEG_TIMEOUT_MS = 120_000;

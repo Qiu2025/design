@@ -1,5 +1,4 @@
 import React, { MouseEventHandler, useContext, useState } from "react";
-import { track } from "@vercel/analytics";
 
 import ImageIcon from "../assets/icons/image-16.svg";
 import LinkIcon from "../assets/icons/link-16.svg";
@@ -17,8 +16,6 @@ import useHotkeys from "../../../../utils/useHotkeys";
 import usePngClipboardSupported from "../util/usePngClipboardSupported";
 import { useAtom, useAtomValue } from "jotai";
 import { EXPORT_SIZE_OPTIONS, SIZE_LABELS, exportSizeAtom } from "../store/image";
-import { autoDetectLanguageAtom, selectedLanguageAtom } from "../store/code";
-import { LANGUAGES } from "../util/languages";
 import { ButtonGroup } from "@/components/button-group";
 import { Button } from "@/components/button";
 import {
@@ -35,7 +32,7 @@ import {
 } from "@/components/dropdown-menu";
 import { DownloadIcon } from "@raycast/icons";
 import { Kbd, Kbds } from "@/components/kbd";
-import { getCodeImagesHashState, getCodeImagesShareUrl } from "../util/shareState";
+import { getCodeImagesShareUrl } from "../util/shareState";
 
 const ExportButton: React.FC = () => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -46,8 +43,6 @@ const ExportButton: React.FC = () => {
   const customFileName = useAtomValue(fileNameAtom);
   const fileName = customFileName.replaceAll(" ", "-") || "snapbox-code";
   const [exportSize, setExportSize] = useAtom(exportSizeAtom);
-  const selectedLanguage = useAtomValue(selectedLanguageAtom);
-  const autoDetectLanguage = useAtomValue(autoDetectLanguageAtom);
 
   const savePng = async () => {
     if (!frameContext?.current) {
@@ -110,19 +105,6 @@ const ExportButton: React.FC = () => {
 
   const handleExportClick: MouseEventHandler = (event) => {
     event.preventDefault();
-
-    const params = new URLSearchParams(getCodeImagesHashState().replace("#", "?"));
-    track("Export", {
-      theme: params.get("theme") || "candy",
-      background: params.get("background") || "true",
-      darkMode: params.get("darkMode") || "true",
-      padding: params.get("padding") || "64",
-      language: Object.keys(LANGUAGES).find((key) => LANGUAGES[key].name === selectedLanguage?.name) || "auto",
-      autoDetectLanguage: autoDetectLanguage.toString(),
-      title: params.get("title") || "untitled",
-      width: params.get("width") || "auto",
-      size: SIZE_LABELS[exportSize],
-    });
     savePng();
   };
 

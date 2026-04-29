@@ -178,4 +178,5 @@ const lang = {
   },
 };
 
-export default [lang];
+const cedarLangs = [lang];
+export default cedarLangs;

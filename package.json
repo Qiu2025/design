@@ -1,5 +1,5 @@
 {
-  "name": "ray.so",
+  "name": "snapbox",
   "version": "0.2.0",
   "private": true,
   "scripts": {
@@ -31,8 +31,6 @@
     "@radix-ui/react-toggle-group": "^1.1.2",
     "@radix-ui/react-tooltip": "^1.1.8",
     "@raycast/icons": "^0.4.7",
-    "@vercel/analytics": "^1.1.1",
-    "@vercel/og": "^0.6.2",
     "@viselect/react": "^3.9.0",
     "class-variance-authority": "^0.7.0",
     "classnames": "^2.3.2",

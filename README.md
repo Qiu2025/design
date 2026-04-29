@@ -10,7 +10,7 @@
 This repository contains the source code for [snap.sqiu.dev](https://snap.sqiu.dev), a collection of tools for creating code images and icons. It includes:
 
 - [**Code Images**](</app/(navigation)/(code)>): Create beautiful images of your code.
-- [**Icon Maker**](</app/(navigation)/icon/>): Create beautiful icons for Raycast Extensions.
+- [**Icon Maker**](</app/(navigation)/icon/>): Create beautiful icons for your apps and projects.
 
 ## Setup
 
