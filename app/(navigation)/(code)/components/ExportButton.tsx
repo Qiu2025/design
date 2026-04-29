@@ -44,7 +44,7 @@ const ExportButton: React.FC = () => {
   const [, setFlashMessage] = useAtom(derivedFlashMessageAtom);
   const [, setFlashShown] = useAtom(flashShownAtom);
   const customFileName = useAtomValue(fileNameAtom);
-  const fileName = customFileName.replaceAll(" ", "-") || "ray-so-export";
+  const fileName = customFileName.replaceAll(" ", "-") || "snapbox-code";
   const [exportSize, setExportSize] = useAtom(exportSizeAtom);
   const selectedLanguage = useAtomValue(selectedLanguageAtom);
   const autoDetectLanguage = useAtomValue(autoDetectLanguageAtom);

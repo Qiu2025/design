@@ -59,7 +59,6 @@ import { ScrollArea } from "@/components/scroll-area";
 
 const scales = [0.25, 0.5, 1, 2];
 
-const FEEDBACK_EMAIL = "feedback+rayso@raycast.com";
 const DEFAULT_ICON_FILE_NAME = "untitled-icon";
 
 type PresetType = Pick<
@@ -434,6 +433,7 @@ export const IconGenerator = () => {
   const onRandomIconClick = () => {
     pushNewSettings({
       icon: randomElement(Object.keys(Icons) as IconName[]),
+      customSvg: undefined,
     });
   };
 
@@ -1018,8 +1018,8 @@ export const IconGenerator = () => {
               <div className={styles.emptyIconsList}>
                 <BrushIcon className={styles.emptyIconsListIcon} />
                 We couldn’t find an icon for that
-                <Link href={`mailto:${FEEDBACK_EMAIL}?subject=Request%20Icon`}>
-                  Request icon <ArrowRightIcon />
+                <Link href="https://github.com/Qiu2025/snap-box">
+                  Browse all icons <ArrowRightIcon />
                 </Link>
               </div>
             ) : (

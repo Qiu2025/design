@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import OgImage from "./assets/og-image.png";
 
 const pageTitle = "Icon Maker";
-const pageDescription = "Create beautiful icons for your next project, app, or Raycast extension.";
+const pageDescription = "Create beautiful icons for your next project or app.";
 const ogUrl = OgImage.src;
 
 export const metadata: Metadata = {

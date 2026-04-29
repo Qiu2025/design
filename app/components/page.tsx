@@ -28,8 +28,8 @@ import {
   HeartIcon,
   MagnifyingGlassIcon,
   PlusCircleIcon,
-  RaycastLogoNegIcon,
 } from "@raycast/icons";
+import SnapBoxLogo from "@/app/assets/snapbox-logo.svg";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/dialog";
 import { Kbd, Kbds, Shortcut } from "@/components/kbd";
 import { Input, InputSlot } from "@/components/input";
@@ -60,7 +60,7 @@ export default function Components() {
   return (
     <div className="flex flex-col gap-12 items-start p-8">
       <h1 className="text-lg font-bold flex text-nowrap items-center gap-2">
-        <RaycastLogoNegIcon className="shrink-0 w-6 h-6" /> Ray.so Component Playground
+        <SnapBoxLogo className="shrink-0 w-6 h-6" /> SnapBox Component Playground
       </h1>
       <div className="flex flex-col gap-4 items-start">
         <h2 className="font-medium">Dropdown Menu</h2>

@@ -160,7 +160,6 @@ export async function GET(req: NextRequest) {
   if (
     url.hostname.endsWith(SHORT_LINK_PUBLIC_DOMAIN) ||
     url.hostname.endsWith(shlinkShortDomain) ||
-    url.hostname.includes("raycastapp.vercel.app") ||
     url.hostname === "localhost" ||
     url.hostname === "127.0.0.1" ||
     url.hostname === "[::1]" ||

@@ -399,14 +399,14 @@
 }
 
 .feedbackSuccess {
-  border: 1px solid hsla(142, 70%, 45%, 0.3);
-  background: hsla(142, 70%, 45%, 0.08);
+  border: 1px solid hsla(142, 70%, 45%, 0.5);
+  background: hsla(142, 70%, 45%, 0.15);
   color: hsl(142, 70%, 60%);
 }
 
 .feedbackError {
-  border: 1px solid hsla(0, 70%, 50%, 0.3);
-  background: hsla(0, 70%, 50%, 0.08);
+  border: 1px solid hsla(0, 70%, 50%, 0.5);
+  background: hsla(0, 70%, 50%, 0.15);
   color: hsl(0, 70%, 65%);
 }
 
