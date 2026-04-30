@@ -282,6 +282,7 @@ export const IconGenerator = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const searchTerm = searchParams.get("q") || "";
+  const ICON_SETTINGS_STORAGE_KEY = "rayso.icon.settings.v1";
 
   const booleanSettingKeys = new Set(["backgroundRadialGlare", "backgroundNoiseTexture"]);
   const numberSettingKeys = new Set([
@@ -348,6 +349,25 @@ export const IconGenerator = () => {
       };
     }, {} as Partial<SettingsType>);
 
+    const hasUrlState = Object.keys(baseSettings).some((key) => searchParams.get(key) !== null);
+
+    if (!hasUrlState && typeof window !== "undefined") {
+      try {
+        const persistedRaw = window.localStorage.getItem(ICON_SETTINGS_STORAGE_KEY);
+
+        if (persistedRaw) {
+          const persistedSettings = JSON.parse(persistedRaw) as Partial<SettingsType>;
+
+          return {
+            ...baseSettings,
+            ...persistedSettings,
+          };
+        }
+      } catch {
+        // Ignore invalid persisted settings and continue with defaults.
+      }
+    }
+
     return { ...baseSettings, ...settingsFromUrl };
   });
   const [history, setHistory] = useState<SettingsType[]>(() => [initialSettings]);
@@ -402,6 +422,14 @@ export const IconGenerator = () => {
       setInfoMessageVisible(false);
     }, 3000);
   };
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(ICON_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    } catch {
+      // Ignore storage failures (private mode, quota exceeded, etc.)
+    }
+  }, [settings]);
 
   const undo = useCallback(() => {
     if (history.length <= 1) {
