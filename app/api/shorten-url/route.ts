@@ -126,16 +126,13 @@ const normalizeDestinationUrl = (url: URL) => {
     url.hostname === "[::1]" ||
     url.hostname.startsWith("192.168.");
 
-  if (!isLocalhost) {
+  // Keep localhost URLs as-is, don't normalize them
+  if (isLocalhost) {
     return url.href;
   }
 
-  const normalized = new URL(url.href);
-  const canonical = new URL(canonicalAppOrigin);
-  normalized.protocol = canonical.protocol;
-  normalized.host = canonical.host;
-
-  return normalized.href;
+  // For non-localhost URLs, keep them as-is as well
+  return url.href;
 };
 
 export async function GET(req: NextRequest) {
