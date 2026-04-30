@@ -27,6 +27,15 @@ import styles from "./metadata-remover.module.css";
 type Mode = "image" | "video";
 type ProcessingState = "idle" | "uploading" | "processing" | "done" | "error";
 type MetadataEntry = { key: string; value: string };
+const METADATA_TOOL_STORAGE_KEY = "rayso.metadata.tool.v1";
+const METADATA_FILES_DB = "rayso.metadata.files.v1";
+const METADATA_FILES_STORE = "files";
+
+type PersistedFileRecord = {
+  key: "image" | "video";
+  file: File;
+  savedAt: number;
+};
 
 const MIME_TO_EXPORT_TYPE: Record<string, string> = {
   "image/jpeg": "image/jpeg",
@@ -53,6 +62,65 @@ const formatBytes = (value: number) => {
   const mb = value / (1024 * 1024);
   if (mb < 1024) return `${mb.toFixed(1)} MB`;
   return `${(mb / 1024).toFixed(2)} GB`;
+};
+
+const openMetadataFilesDb = (): Promise<IDBDatabase> => {
+  return new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(METADATA_FILES_DB, 1);
+
+    request.onupgradeneeded = () => {
+      const db = request.result;
+
+      if (!db.objectStoreNames.contains(METADATA_FILES_STORE)) {
+        db.createObjectStore(METADATA_FILES_STORE, { keyPath: "key" });
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error("Could not open IndexedDB"));
+  });
+};
+
+const persistFileToIndexedDb = async (mode: Mode, file: File | null) => {
+  const db = await openMetadataFilesDb();
+
+  await new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction(METADATA_FILES_STORE, "readwrite");
+    const store = transaction.objectStore(METADATA_FILES_STORE);
+
+    if (file) {
+      const record: PersistedFileRecord = {
+        key: mode,
+        file,
+        savedAt: Date.now(),
+      };
+      store.put(record);
+    } else {
+      store.delete(mode);
+    }
+
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error || new Error("Could not persist file"));
+    transaction.onabort = () => reject(transaction.error || new Error("File persistence aborted"));
+  });
+
+  db.close();
+};
+
+const readPersistedFileFromIndexedDb = async (mode: Mode): Promise<File | null> => {
+  const db = await openMetadataFilesDb();
+
+  const record = await new Promise<PersistedFileRecord | undefined>((resolve, reject) => {
+    const transaction = db.transaction(METADATA_FILES_STORE, "readonly");
+    const store = transaction.objectStore(METADATA_FILES_STORE);
+    const request = store.get(mode);
+
+    request.onsuccess = () => resolve(request.result as PersistedFileRecord | undefined);
+    request.onerror = () => reject(request.error || new Error("Could not restore file"));
+  });
+
+  db.close();
+  return record?.file ?? null;
 };
 
 /* ── Lightweight EXIF parser (client-side, no deps) ── */
@@ -161,16 +229,56 @@ function tagName(tag: number) {
 
 /* ── Component ── */
 export function MetadataRemover() {
-  const [mode, setMode] = useState<Mode>("image");
+  const [mode, setMode] = useState<Mode>(() => {
+    if (typeof window === "undefined") {
+      return "image";
+    }
+
+    try {
+      const persisted = window.localStorage.getItem(METADATA_TOOL_STORAGE_KEY);
+
+      if (!persisted) {
+        return "image";
+      }
+
+      const parsed = JSON.parse(persisted) as { mode?: Mode };
+      return parsed.mode === "video" ? "video" : "image";
+    } catch {
+      return "image";
+    }
+  });
   const [file, setFile] = useState<File | null>(null);
   const [processingState, setProcessingState] = useState<ProcessingState>("idle");
-  const [quality, setQuality] = useState(92);
+  const [quality, setQuality] = useState<number>(() => {
+    if (typeof window === "undefined") {
+      return 92;
+    }
+
+    try {
+      const persisted = window.localStorage.getItem(METADATA_TOOL_STORAGE_KEY);
+
+      if (!persisted) {
+        return 92;
+      }
+
+      const parsed = JSON.parse(persisted) as { quality?: number };
+
+      if (typeof parsed.quality !== "number") {
+        return 92;
+      }
+
+      return Math.max(60, Math.min(100, Math.round(parsed.quality)));
+    } catch {
+      return 92;
+    }
+  });
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [metadataEntries, setMetadataEntries] = useState<MetadataEntry[]>([]);
   const [metadataLoading, setMetadataLoading] = useState(false);
+  const [hasAttemptedRestore, setHasAttemptedRestore] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
@@ -178,6 +286,20 @@ export function MetadataRemover() {
   const qualityValue = useMemo(() => quality / 100, [quality]);
   const isLossy = file ? file.type === "image/jpeg" || file.type === "image/webp" : false;
   const isProcessing = processingState === "uploading" || processingState === "processing";
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        METADATA_TOOL_STORAGE_KEY,
+        JSON.stringify({
+          mode,
+          quality,
+        }),
+      );
+    } catch {
+      // Ignore storage failures.
+    }
+  }, [mode, quality]);
 
   const resetFeedback = useCallback(() => {
     setMessage(null);
@@ -192,6 +314,52 @@ export function MetadataRemover() {
     setMetadataLoading(false);
     resetFeedback();
   }, [resetFeedback]);
+
+  const setSelectedFile = useCallback(
+    async (nextFile: File | null) => {
+      setFile(nextFile);
+
+      try {
+        await persistFileToIndexedDb(mode, nextFile);
+      } catch {
+        // Ignore persistence failures (quota/private mode), keep in-memory behavior.
+      }
+    },
+    [mode],
+  );
+
+  useEffect(() => {
+    setHasAttemptedRestore(false);
+  }, [mode]);
+
+  useEffect(() => {
+    if (hasAttemptedRestore || file) {
+      return;
+    }
+
+    let active = true;
+
+    readPersistedFileFromIndexedDb(mode)
+      .then((persistedFile) => {
+        if (!active || !persistedFile) {
+          return;
+        }
+
+        setFile(persistedFile);
+      })
+      .catch(() => {
+        // Ignore restore failures and continue without persisted file.
+      })
+      .finally(() => {
+        if (active) {
+          setHasAttemptedRestore(true);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [file, hasAttemptedRestore, mode]);
 
   /* Auto-read EXIF when an image file is selected */
   useEffect(() => {
@@ -214,7 +382,7 @@ export function MetadataRemover() {
     const f = e.target.files?.[0] || null;
     resetFeedback();
     setProcessingState("idle");
-    setFile(f);
+    void setSelectedFile(f);
   };
 
   const onDragEnter = (e: DragEvent) => {
@@ -238,10 +406,13 @@ export function MetadataRemover() {
     resetFeedback();
     setProcessingState("idle");
     const f = e.dataTransfer?.files?.[0] || null;
-    if (f) setFile(f);
+    if (f) {
+      void setSelectedFile(f);
+    }
   };
   const onRemoveFile = () => {
     resetAll();
+    void setSelectedFile(null);
     if (inputRef.current) inputRef.current.value = "";
   };
 
