@@ -13,6 +13,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { Button } from "@/components/button";
 import { NavigationActions } from "@/components/navigation";
+import { InfoDialog } from "./components/InfoDialog";
 import {
   getOutputFileName,
   isSupportedImageExtension,
@@ -26,7 +27,15 @@ import styles from "./metadata-remover.module.css";
 
 type Mode = "image" | "video";
 type ProcessingState = "idle" | "uploading" | "processing" | "done" | "error";
-type MetadataEntry = { key: string; value: string };
+type MetadataEntry = {
+  id: string;
+  group: string;
+  label: string;
+  value: string;
+  key: string;
+  scope: "image" | "format" | "stream";
+  streamIndex?: number;
+};
 const METADATA_TOOL_STORAGE_KEY = "rayso.metadata.tool.v1";
 const METADATA_FILES_DB = "rayso.metadata.files.v1";
 const METADATA_FILES_STORE = "files";
@@ -35,16 +44,6 @@ type PersistedFileRecord = {
   key: "image" | "video";
   file: File;
   savedAt: number;
-};
-
-const MIME_TO_EXPORT_TYPE: Record<string, string> = {
-  "image/jpeg": "image/jpeg",
-  "image/png": "image/png",
-  "image/webp": "image/webp",
-  "image/bmp": "image/png",
-  "image/gif": "image/png",
-  "image/tiff": "image/png",
-  "image/svg+xml": "image/png",
 };
 
 const downloadBlob = (blob: Blob, fileName: string) => {
@@ -123,110 +122,6 @@ const readPersistedFileFromIndexedDb = async (mode: Mode): Promise<File | null> 
   return record?.file ?? null;
 };
 
-/* ── Lightweight EXIF parser (client-side, no deps) ── */
-function readExifFromFile(file: File): Promise<MetadataEntry[]> {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const entries: MetadataEntry[] = [];
-      try {
-        const view = new DataView(reader.result as ArrayBuffer);
-        if (view.getUint16(0) !== 0xffd8) {
-          resolve([]);
-          return;
-        }
-        let offset = 2;
-        while (offset < view.byteLength - 1) {
-          const marker = view.getUint16(offset);
-          if (marker === 0xffe1) {
-            const length = view.getUint16(offset + 2);
-            const exifBlock = new Uint8Array(reader.result as ArrayBuffer, offset + 4, length - 2);
-            const str = new TextDecoder("latin1").decode(exifBlock);
-            if (str.startsWith("Exif")) {
-              const tiffOffset = offset + 10;
-              const littleEndian = view.getUint16(tiffOffset) === 0x4949;
-              const ifdOffset = view.getUint32(tiffOffset + 4, littleEndian);
-              const ifdStart = tiffOffset + ifdOffset;
-              if (ifdStart + 2 < view.byteLength) {
-                const count = view.getUint16(ifdStart, littleEndian);
-                for (let i = 0; i < count && ifdStart + 2 + i * 12 + 12 <= view.byteLength; i++) {
-                  const entryOffset = ifdStart + 2 + i * 12;
-                  const tag = view.getUint16(entryOffset, littleEndian);
-                  const type = view.getUint16(entryOffset + 2, littleEndian);
-                  const numValues = view.getUint32(entryOffset + 4, littleEndian);
-                  let val = "";
-                  if (type === 3) val = String(view.getUint16(entryOffset + 8, littleEndian));
-                  else if (type === 4) val = String(view.getUint32(entryOffset + 8, littleEndian));
-                  else if (type === 2) {
-                    const strLen = numValues;
-                    const valueOffset =
-                      strLen <= 4 ? entryOffset + 8 : tiffOffset + view.getUint32(entryOffset + 8, littleEndian);
-                    if (valueOffset + strLen <= view.byteLength) {
-                      const bytes = new Uint8Array(reader.result as ArrayBuffer, valueOffset, strLen);
-                      val = new TextDecoder("latin1").decode(bytes).replace(/\0/g, "").trim();
-                    }
-                  } else if (type === 5 && numValues === 1) {
-                    const rOff = tiffOffset + view.getUint32(entryOffset + 8, littleEndian);
-                    if (rOff + 8 <= view.byteLength) {
-                      const num = view.getUint32(rOff, littleEndian);
-                      const den = view.getUint32(rOff + 4, littleEndian);
-                      val = den ? `${num}/${den}` : String(num);
-                    }
-                  }
-                  if (val) entries.push({ key: tagName(tag), value: val });
-                }
-              }
-            }
-            break;
-          }
-          if ((marker & 0xff00) !== 0xff00) break;
-          offset += 2 + view.getUint16(offset + 2);
-        }
-      } catch {
-        /* parsing failed — return what we have */
-      }
-      resolve(entries);
-    };
-    reader.onerror = () => resolve([]);
-    reader.readAsArrayBuffer(file.slice(0, 128 * 1024));
-  });
-}
-
-const EXIF_TAGS: Record<number, string> = {
-  0x010f: "Camera Make",
-  0x0110: "Camera Model",
-  0x0112: "Orientation",
-  0x011a: "X Resolution",
-  0x011b: "Y Resolution",
-  0x0128: "Resolution Unit",
-  0x0131: "Software",
-  0x0132: "Date/Time",
-  0x013b: "Artist",
-  0x8298: "Copyright",
-  0x8769: "Exif IFD",
-  0x8825: "GPS IFD",
-  0x0100: "Image Width",
-  0x0101: "Image Height",
-  0x0102: "Bits/Sample",
-  0x0103: "Compression",
-  0x0106: "Photometric Interp.",
-  0x010e: "Image Description",
-  0x0201: "JPEG Offset",
-  0x0202: "JPEG Length",
-  0xa002: "Pixel X Dimension",
-  0xa003: "Pixel Y Dimension",
-  0x9003: "Date Original",
-  0x9004: "Date Digitized",
-  0x829a: "Exposure Time",
-  0x829d: "F-Number",
-  0x9207: "Metering Mode",
-  0x920a: "Focal Length",
-  0xa405: "Focal Length (35mm)",
-};
-function tagName(tag: number) {
-  return EXIF_TAGS[tag] || `Tag 0x${tag.toString(16).toUpperCase()}`;
-}
-
 /* ── Component ── */
 export function MetadataRemover() {
   const [mode, setMode] = useState<Mode>(() => {
@@ -249,43 +144,48 @@ export function MetadataRemover() {
   });
   const [file, setFile] = useState<File | null>(null);
   const [processingState, setProcessingState] = useState<ProcessingState>("idle");
-  const [quality, setQuality] = useState<number>(() => {
-    if (typeof window === "undefined") {
-      return 92;
-    }
-
-    try {
-      const persisted = window.localStorage.getItem(METADATA_TOOL_STORAGE_KEY);
-
-      if (!persisted) {
-        return 92;
-      }
-
-      const parsed = JSON.parse(persisted) as { quality?: number };
-
-      if (typeof parsed.quality !== "number") {
-        return 92;
-      }
-
-      return Math.max(60, Math.min(100, Math.round(parsed.quality)));
-    } catch {
-      return 92;
-    }
-  });
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [metadataEntries, setMetadataEntries] = useState<MetadataEntry[]>([]);
+  const [selectedMetadata, setSelectedMetadata] = useState<Set<string>>(new Set());
   const [metadataLoading, setMetadataLoading] = useState(false);
+  const [metadataError, setMetadataError] = useState<string | null>(null);
+  const [metadataQuery, setMetadataQuery] = useState("");
   const [hasAttemptedRestore, setHasAttemptedRestore] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
-  const qualityValue = useMemo(() => quality / 100, [quality]);
-  const isLossy = file ? file.type === "image/jpeg" || file.type === "image/webp" : false;
   const isProcessing = processingState === "uploading" || processingState === "processing";
+  const selectedCount = selectedMetadata.size;
+
+  const filteredEntries = useMemo(() => {
+    if (!metadataQuery.trim()) {
+      return metadataEntries;
+    }
+    const query = metadataQuery.toLowerCase();
+    return metadataEntries.filter(
+      (entry) =>
+        entry.label.toLowerCase().includes(query) ||
+        entry.value.toLowerCase().includes(query) ||
+        entry.group.toLowerCase().includes(query),
+    );
+  }, [metadataEntries, metadataQuery]);
+
+  const groupedEntries = useMemo(() => {
+    const groups = new Map<string, MetadataEntry[]>();
+    filteredEntries.forEach((entry) => {
+      const group = entry.group || "Other";
+      if (!groups.has(group)) {
+        groups.set(group, []);
+      }
+      groups.get(group)?.push(entry);
+    });
+
+    return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [filteredEntries]);
 
   useEffect(() => {
     try {
@@ -293,13 +193,12 @@ export function MetadataRemover() {
         METADATA_TOOL_STORAGE_KEY,
         JSON.stringify({
           mode,
-          quality,
         }),
       );
     } catch {
       // Ignore storage failures.
     }
-  }, [mode, quality]);
+  }, [mode]);
 
   const resetFeedback = useCallback(() => {
     setMessage(null);
@@ -311,7 +210,10 @@ export function MetadataRemover() {
     setProcessingState("idle");
     setUploadProgress(0);
     setMetadataEntries([]);
+    setSelectedMetadata(new Set());
     setMetadataLoading(false);
+    setMetadataError(null);
+    setMetadataQuery("");
     resetFeedback();
   }, [resetFeedback]);
 
@@ -361,21 +263,50 @@ export function MetadataRemover() {
     };
   }, [file, hasAttemptedRestore, mode]);
 
-  /* Auto-read EXIF when an image file is selected */
   useEffect(() => {
-    if (!file || mode !== "image") {
+    if (!file) {
       setMetadataEntries([]);
+      setSelectedMetadata(new Set());
+      setMetadataError(null);
       return;
     }
-    if (file.type !== "image/jpeg") {
-      setMetadataEntries([]);
-      return;
-    }
+
+    let active = true;
+    const formData = new FormData();
+    formData.set("file", file);
+    formData.set("mode", mode);
+
     setMetadataLoading(true);
-    readExifFromFile(file).then((entries) => {
-      setMetadataEntries(entries);
-      setMetadataLoading(false);
-    });
+    setMetadataError(null);
+
+    fetch("/api/metadata/inspect", { method: "POST", body: formData })
+      .then(async (res) => {
+        const payload = await res.json();
+        if (!res.ok) {
+          throw new Error(payload?.error || "Unable to inspect metadata.");
+        }
+        return payload.entries as MetadataEntry[];
+      })
+      .then((entries) => {
+        if (!active) return;
+        setMetadataEntries(entries);
+        setSelectedMetadata(new Set(entries.map((entry) => entry.id)));
+      })
+      .catch((error: Error) => {
+        if (!active) return;
+        setMetadataEntries([]);
+        setSelectedMetadata(new Set());
+        setMetadataError(error.message);
+      })
+      .finally(() => {
+        if (active) {
+          setMetadataLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
   }, [file, mode]);
 
   const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -416,112 +347,165 @@ export function MetadataRemover() {
     if (inputRef.current) inputRef.current.value = "";
   };
 
+  const toggleMetadataSelection = (id: string) => {
+    setSelectedMetadata((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const selectAllMetadata = () => {
+    setSelectedMetadata(new Set(metadataEntries.map((entry) => entry.id)));
+  };
+
+  const deselectAllMetadata = () => {
+    setSelectedMetadata(new Set());
+  };
+
+  const selectGroupMetadata = (entries: MetadataEntry[]) => {
+    setSelectedMetadata((prev) => {
+      const next = new Set(prev);
+      entries.forEach((entry) => next.add(entry.id));
+      return next;
+    });
+  };
+
+  const deselectGroupMetadata = (entries: MetadataEntry[]) => {
+    setSelectedMetadata((prev) => {
+      const next = new Set(prev);
+      entries.forEach((entry) => next.delete(entry.id));
+      return next;
+    });
+  };
+
   const validateImageFile = (f: File) => isSupportedImageType(f.type) || isSupportedImageExtension(f.name);
   const validateVideoFile = (f: File) => isSupportedVideoType(f.type) || isSupportedVideoExtension(f.name);
 
-  const removeImageMetadata = async () => {
+  const removeSelectedMetadata = async () => {
     if (!file) {
-      setError("Select an image file first.");
+      setError(`Select a ${mode} file first.`);
       return;
     }
-    if (!validateImageFile(file)) {
+
+    if (mode === "image" && !validateImageFile(file)) {
       setError("Unsupported image format.");
       return;
     }
-    setProcessingState("processing");
-    resetFeedback();
-    try {
-      const dataUrl = await new Promise<string>((res, rej) => {
-        const r = new FileReader();
-        r.onload = () => res(String(r.result));
-        r.onerror = () => rej(new Error("Read failed"));
-        r.readAsDataURL(file);
-      });
-      const img = await new Promise<HTMLImageElement>((res, rej) => {
-        const i = new Image();
-        i.onload = () => res(i);
-        i.onerror = () => rej(new Error("Decode failed"));
-        i.src = dataUrl;
-      });
-      const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Canvas failed");
-      ctx.drawImage(img, 0, 0);
-      const exportType = MIME_TO_EXPORT_TYPE[file.type] || "image/png";
-      const qp = exportType === "image/jpeg" || exportType === "image/webp" ? qualityValue : undefined;
-      const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, exportType, qp));
-      if (!blob) throw new Error("Export failed");
-      downloadBlob(blob, getOutputFileName(file.name, "clean"));
-      setProcessingState("done");
-      setMessage("Image exported without metadata.");
-    } catch (err) {
-      setProcessingState("error");
-      setError(`Image processing failed: ${err instanceof Error ? err.message : "Unknown error"}`);
-    }
-  };
 
-  const removeVideoMetadata = async () => {
-    if (!file) {
-      setError("Select a video file first.");
-      return;
-    }
-    if (!validateVideoFile(file)) {
+    if (mode === "video" && !validateVideoFile(file)) {
       setError("Unsupported video format.");
       return;
     }
-    if (file.size > MAX_VIDEO_BYTES) {
+
+    if (mode === "video" && file.size > MAX_VIDEO_BYTES) {
       setError(`File exceeds ${formatBytes(MAX_VIDEO_BYTES)} limit.`);
       return;
     }
-    setProcessingState("uploading");
-    setUploadProgress(0);
+
+    const selectedEntries = metadataEntries.filter((entry) => selectedMetadata.has(entry.id));
+
+    if (selectedEntries.length === 0) {
+      setError("Select at least one metadata field to remove.");
+      return;
+    }
+
     resetFeedback();
+
     try {
+      if (mode === "video") {
+        setProcessingState("uploading");
+        setUploadProgress(0);
+
+        const formData = new FormData();
+        formData.set("file", file);
+        formData.set("mode", mode);
+        formData.set(
+          "selected",
+          JSON.stringify(selectedEntries.map(({ scope, key, streamIndex }) => ({ scope, key, streamIndex }))),
+        );
+
+        const { blob, fileName } = await new Promise<{ blob: Blob; fileName: string }>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.upload.addEventListener("progress", (ev) => {
+            if (ev.lengthComputable) {
+              const pct = Math.round((ev.loaded / ev.total) * 100);
+              setUploadProgress(pct);
+              if (pct >= 100) setProcessingState("processing");
+            }
+          });
+          xhr.addEventListener("load", () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve({
+                blob: xhr.response as Blob,
+                fileName: xhr.getResponseHeader("X-Output-File") || getOutputFileName(file.name, "clean"),
+              });
+            } else {
+              const r = new FileReader();
+              r.onload = () => {
+                try {
+                  reject(new Error(JSON.parse(r.result as string)?.error || "Unknown"));
+                } catch {
+                  reject(new Error("Unknown"));
+                }
+              };
+              r.onerror = () => reject(new Error("Unknown"));
+              r.readAsText(xhr.response);
+            }
+          });
+          xhr.addEventListener("error", () => reject(new Error("Network error.")));
+          xhr.addEventListener("timeout", () => reject(new Error("Request timed out.")));
+          xhr.open("POST", "/api/metadata/remove");
+          xhr.responseType = "blob";
+          xhr.timeout = 180_000;
+          xhr.send(formData);
+        });
+
+        downloadBlob(blob, fileName);
+        setProcessingState("done");
+        setMessage(
+          `Video processed — removed ${selectedEntries.length} metadata field${selectedEntries.length !== 1 ? "s" : ""}.`,
+        );
+        return;
+      }
+
+      setProcessingState("processing");
+
       const formData = new FormData();
       formData.set("file", file);
-      const { blob, fileName } = await new Promise<{ blob: Blob; fileName: string }>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.upload.addEventListener("progress", (ev) => {
-          if (ev.lengthComputable) {
-            const pct = Math.round((ev.loaded / ev.total) * 100);
-            setUploadProgress(pct);
-            if (pct >= 100) setProcessingState("processing");
-          }
-        });
-        xhr.addEventListener("load", () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve({
-              blob: xhr.response as Blob,
-              fileName: xhr.getResponseHeader("X-Output-File") || getOutputFileName(file.name, "clean"),
-            });
-          } else {
-            const r = new FileReader();
-            r.onload = () => {
-              try {
-                reject(new Error(JSON.parse(r.result as string)?.error || "Unknown"));
-              } catch {
-                reject(new Error("Unknown"));
-              }
-            };
-            r.onerror = () => reject(new Error("Unknown"));
-            r.readAsText(xhr.response);
-          }
-        });
-        xhr.addEventListener("error", () => reject(new Error("Network error.")));
-        xhr.addEventListener("timeout", () => reject(new Error("Request timed out.")));
-        xhr.open("POST", "/api/remove-video-metadata");
-        xhr.responseType = "blob";
-        xhr.timeout = 180_000;
-        xhr.send(formData);
-      });
-      downloadBlob(blob, fileName);
+      formData.set("mode", mode);
+      formData.set(
+        "selected",
+        JSON.stringify(selectedEntries.map(({ scope, key, streamIndex }) => ({ scope, key, streamIndex }))),
+      );
+
+      const response = await fetch("/api/metadata/remove", { method: "POST", body: formData });
+      const blob = await response.blob();
+
+      if (!response.ok) {
+        let detail = "Unknown error";
+        try {
+          const text = await blob.text();
+          detail = JSON.parse(text)?.error || detail;
+        } catch {
+          // ignore parse errors
+        }
+        throw new Error(detail);
+      }
+
+      const outputName = response.headers.get("X-Output-File") || getOutputFileName(file.name, "clean");
+      downloadBlob(blob, outputName);
       setProcessingState("done");
-      setMessage("Video processed — metadata removed.");
+      setMessage(
+        `Image exported. Removed ${selectedEntries.length} metadata field${selectedEntries.length !== 1 ? "s" : ""}.`,
+      );
     } catch (err) {
       setProcessingState("error");
-      setError(`Video processing failed: ${err instanceof Error ? err.message : "Unknown error"}`);
+      setError(`Processing failed: ${err instanceof Error ? err.message : "Unknown error"}`);
     }
   };
 
@@ -536,13 +520,14 @@ export function MetadataRemover() {
   return (
     <>
       <NavigationActions>
+        <InfoDialog />
         <Button
-          onClick={mode === "image" ? removeImageMetadata : removeVideoMetadata}
-          disabled={isProcessing || !file}
+          onClick={removeSelectedMetadata}
+          disabled={isProcessing || !file || selectedCount === 0}
           variant="primary"
         >
           <EraserIcon className="h-4 w-4" />
-          {isProcessing ? "Processing…" : "Remove Metadata"}
+          {isProcessing ? "Processing…" : `Remove Metadata${selectedCount > 0 ? ` (${selectedCount})` : ""}`}
         </Button>
       </NavigationActions>
 
@@ -550,8 +535,7 @@ export function MetadataRemover() {
         <header className={styles.header}>
           <h1 className={styles.title}>Remove metadata from your files</h1>
           <p className={styles.subtitle}>
-            Strip EXIF, XMP, IPTC and other embedded metadata for privacy. Choose between image and video processing
-            below.
+            Review detected metadata, choose what to remove, and export a clean image or video.
           </p>
         </header>
 
@@ -627,11 +611,7 @@ export function MetadataRemover() {
               <div className={styles.spinner} />
               <p className={styles.processingText}>{processingState === "uploading" ? "Uploading…" : "Processing…"}</p>
               <p className={styles.processingHint}>
-                {processingState === "uploading"
-                  ? "Sending file to server"
-                  : mode === "image"
-                    ? "Stripping metadata locally"
-                    : "Server is removing metadata"}
+                {processingState === "uploading" ? "Sending file to server" : "Server is removing metadata"}
               </p>
             </div>
           </div>
@@ -653,55 +633,92 @@ export function MetadataRemover() {
           </div>
         )}
 
-        {/* Metadata preview for JPEG images */}
-        {file && !isProcessing && mode === "image" && (metadataLoading || metadataEntries.length > 0) && (
+        {/* Metadata preview */}
+        {file && !isProcessing && (metadataLoading || metadataEntries.length > 0 || metadataError) && (
           <div className={styles.metadataPreview}>
-            <p className={styles.metadataTitle}>Detected metadata</p>
+            <div className={styles.metadataHeader}>
+              <p className={styles.metadataTitle}>Detected metadata</p>
+              {metadataEntries.length > 0 && !metadataLoading && (
+                <div className={styles.metadataControls}>
+                  <button type="button" onClick={selectAllMetadata} className={styles.metadataControlButton}>
+                    Select all
+                  </button>
+                  <button type="button" onClick={deselectAllMetadata} className={styles.metadataControlButton}>
+                    Clear
+                  </button>
+                </div>
+              )}
+            </div>
+
             {metadataLoading ? (
               <p className={styles.metadataHint}>Reading…</p>
+            ) : metadataError ? (
+              <p className={styles.metadataError}>{metadataError}</p>
             ) : (
-              <div className={styles.metadataList}>
-                {metadataEntries.map((entry, i) => (
-                  <div key={i} className={styles.metadataRow}>
-                    <span className={styles.metadataKey}>{entry.key}</span>
-                    <span className={styles.metadataValue}>{entry.value}</span>
+              <>
+                <div className={styles.metadataSearch}>
+                  <input
+                    type="text"
+                    value={metadataQuery}
+                    onChange={(event) => setMetadataQuery(event.target.value)}
+                    placeholder="Search metadata"
+                    className={styles.metadataSearchInput}
+                  />
+                  <span className={styles.metadataSearchCount}>{filteredEntries.length} shown</span>
+                </div>
+
+                {groupedEntries.map(([group, entries]) => (
+                  <div key={group} className={styles.metadataGroup}>
+                    <div className={styles.metadataGroupHeader}>
+                      <div className={styles.metadataGroupTitle}>{group}</div>
+                      <div className={styles.metadataGroupActions}>
+                        <button
+                          type="button"
+                          onClick={() => selectGroupMetadata(entries)}
+                          className={styles.metadataGroupButton}
+                        >
+                          Select
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deselectGroupMetadata(entries)}
+                          className={styles.metadataGroupButton}
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+                    <div className={styles.metadataList}>
+                      {entries.map((entry) => (
+                        <label key={entry.id} className={styles.metadataRow}>
+                          <input
+                            type="checkbox"
+                            checked={selectedMetadata.has(entry.id)}
+                            onChange={() => toggleMetadataSelection(entry.id)}
+                            className={styles.metadataCheckbox}
+                          />
+                          <span className={styles.metadataKey}>{entry.label}</span>
+                          <span className={styles.metadataValue}>{entry.value}</span>
+                        </label>
+                      ))}
+                    </div>
                   </div>
                 ))}
-              </div>
+              </>
             )}
-            <p className={styles.metadataHint}>All detected metadata will be stripped on export.</p>
+
+            <p className={styles.metadataHint}>
+              {selectedCount > 0
+                ? `${selectedCount} metadata field${selectedCount !== 1 ? "s" : ""} selected for removal`
+                : "Select metadata fields to remove"}
+            </p>
           </div>
         )}
 
-        {file &&
-          !isProcessing &&
-          mode === "image" &&
-          !metadataLoading &&
-          metadataEntries.length === 0 &&
-          file.type === "image/jpeg" && (
-            <div className={styles.metadataPreview}>
-              <p className={styles.metadataTitle}>No EXIF metadata detected</p>
-              <p className={styles.metadataHint}>
-                This image may already be clean, or uses non-EXIF metadata that will still be stripped.
-              </p>
-            </div>
-          )}
-
-        {/* Quality slider */}
-        {mode === "image" && file && !isProcessing && isLossy && (
-          <div className={styles.qualitySection}>
-            <span className={styles.qualityLabel}>Quality</span>
-            <input
-              id="quality-slider"
-              type="range"
-              min={60}
-              max={100}
-              step={1}
-              value={quality}
-              onChange={(e) => setQuality(Number(e.target.value))}
-              className={styles.qualitySlider}
-            />
-            <span className={styles.qualityValue}>{quality}</span>
+        {file && !isProcessing && !metadataLoading && !metadataError && metadataEntries.length === 0 && (
+          <div className={styles.metadataPreview}>
+            <p className={styles.metadataTitle}>No metadata detected</p>
+            <p className={styles.metadataHint}>This file may already be clean, or the metadata is not readable.</p>
           </div>
         )}
 
@@ -736,7 +753,7 @@ export function MetadataRemover() {
         <div className={styles.privacyNotice}>
           <Shield01Icon className="h-3.5 w-3.5" />
           {mode === "image"
-            ? "Images are processed entirely in your browser — nothing is uploaded."
+            ? "Images are uploaded to the server for selective removal and deleted immediately after."
             : "Videos are uploaded to the server for processing and deleted immediately after."}
         </div>
       </div>

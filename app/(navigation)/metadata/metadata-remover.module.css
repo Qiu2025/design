@@ -226,72 +226,6 @@
   color: hsl(var(--gray-12));
 }
 
-/* Quality slider */
-.qualitySection {
-  display: flex;
-  width: 100%;
-  max-width: 560px;
-  align-items: center;
-  padding: 14px 18px;
-  border: 1px solid var(--gray-a3);
-  border-radius: 14px;
-  margin-top: 12px;
-  animation: fadeIn 300ms ease;
-  background: var(--gray-a2);
-  gap: 14px;
-}
-
-.qualityLabel {
-  flex-shrink: 0;
-  color: hsl(var(--gray-11));
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.qualitySlider {
-  height: 4px;
-  flex: 1;
-  border-radius: 2px;
-  appearance: none;
-  background: var(--gray-a4);
-  outline: none;
-  transition: background 200ms ease;
-}
-
-.qualitySlider::-webkit-slider-thumb {
-  width: 16px;
-  height: 16px;
-  border: 2px solid hsl(var(--gray-12));
-  border-radius: 50%;
-  appearance: none;
-  background: hsl(var(--gray-12));
-  cursor: pointer;
-  transition: transform 150ms ease;
-}
-
-.qualitySlider::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
-}
-
-.qualitySlider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border: 2px solid hsl(var(--gray-12));
-  border-radius: 50%;
-  background: hsl(var(--gray-12));
-  cursor: pointer;
-}
-
-.qualityValue {
-  min-width: 32px;
-  color: hsl(var(--gray-12));
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  text-align: right;
-}
-
 /* Metadata preview */
 .metadataPreview {
   width: 100%;
@@ -304,11 +238,118 @@
   background: var(--gray-a2);
 }
 
+.metadataHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 12px;
+}
+
 .metadataTitle {
-  margin: 0 0 10px;
+  margin: 0;
   color: hsl(var(--gray-12));
   font-size: 13px;
   font-weight: 600;
+}
+
+.metadataControls {
+  display: flex;
+  gap: 8px;
+}
+
+.metadataControlButton {
+  padding: 4px 10px;
+  border: 1px solid var(--gray-a4);
+  border-radius: 6px;
+  background: var(--gray-a2);
+  color: hsl(var(--gray-11));
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  transition: all 200ms ease;
+}
+
+.metadataControlButton:hover {
+  border-color: var(--gray-a5);
+  background: var(--gray-a3);
+  color: hsl(var(--gray-12));
+}
+
+.metadataSearch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.metadataSearchInput {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--gray-a4);
+  border-radius: 8px;
+  background: var(--gray-a2);
+  color: hsl(var(--gray-12));
+  font-size: 12px;
+  outline: none;
+}
+
+.metadataSearchInput::placeholder {
+  color: hsl(var(--gray-9));
+}
+
+.metadataSearchInput:focus {
+  border-color: var(--gray-a6);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.06);
+}
+
+.metadataSearchCount {
+  color: hsl(var(--gray-9));
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.metadataGroup {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12px;
+  gap: 8px;
+}
+
+.metadataGroupHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.metadataGroupTitle {
+  color: hsl(var(--gray-11));
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.metadataGroupActions {
+  display: flex;
+  gap: 6px;
+}
+
+.metadataGroupButton {
+  padding: 2px 8px;
+  border: 1px solid var(--gray-a4);
+  border-radius: 999px;
+  background: var(--gray-a2);
+  color: hsl(var(--gray-11));
+  cursor: pointer;
+  font-size: 10px;
+  transition: all 150ms ease;
+}
+
+.metadataGroupButton:hover {
+  border-color: var(--gray-a5);
+  background: var(--gray-a3);
+  color: hsl(var(--gray-12));
 }
 
 .metadataList {
@@ -324,14 +365,32 @@
 
 .metadataRow {
   display: flex;
-  align-items: baseline;
-  padding: 6px 10px;
+  align-items: center;
+  padding: 8px 10px;
   background: var(--gray-a2);
-  gap: 12px;
+  cursor: pointer;
+  gap: 10px;
+  transition: background 150ms ease;
+}
+
+.metadataRow:hover {
+  background: var(--gray-a3);
 }
 
 .metadataRow:nth-child(even) {
   background: var(--gray-a3);
+}
+
+.metadataRow:hover:nth-child(even) {
+  background: var(--gray-a4);
+}
+
+.metadataCheckbox {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  accent-color: hsl(var(--brand));
+  cursor: pointer;
 }
 
 .metadataKey {
@@ -352,6 +411,12 @@
   margin: 0;
   color: hsl(var(--gray-9));
   font-size: 11px;
+}
+
+.metadataError {
+  margin: 0;
+  color: hsl(var(--red-11));
+  font-size: 12px;
 }
 
 /* Processing overlay */
