@@ -6,6 +6,13 @@ const withBundleAnalyzer = require("@next/bundle-analyzer")({
 
 const nextConfig = {
   output: "standalone",
+  outputFileTracingIncludes: {
+    "/api/metadata/assets/*": [
+      "./node_modules/@6over3/zeroperl-ts/dist/esm/zeroperl.wasm",
+      "./node_modules/@ffmpeg/core/dist/umd/ffmpeg-core.js",
+      "./node_modules/@ffmpeg/core/dist/umd/ffmpeg-core.wasm",
+    ],
+  },
   reactStrictMode: true,
   transpilePackages: ["highlight.js"],
   experimental: {
@@ -54,6 +61,17 @@ const nextConfig = {
         as: "*.js",
       },
     },
+  },
+  webpack(config, { isServer, webpack }) {
+    if (!isServer) {
+      config.plugins.push(
+        new webpack.IgnorePlugin({
+          resourceRegExp: /^node:fs\/promises$/,
+        }),
+      );
+    }
+
+    return config;
   },
   async rewrites() {
     return {

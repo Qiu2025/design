@@ -2,15 +2,16 @@
   SnapBox
 </h1>
 <p align="center">
-  Create beautiful code images and icons.
+  A compact toolbox for code images, icons, and private metadata cleaning.
 </p>
 
 ## About
 
-This repository contains the source code for [snap.sqiu.dev](https://snap.sqiu.dev), a collection of tools for creating code images and icons. It includes:
+This repository contains the source code for [snap.sqiu.dev](https://snap.sqiu.dev), a collection of small browser tools. It includes:
 
 - [**Code Images**](</app/(navigation)/(code)>): Create beautiful images of your code.
 - [**Icon Maker**](</app/(navigation)/icon/>): Create beautiful icons for your apps and projects.
+- [**Metadata Remover**](</app/(navigation)/metadata/>): Clean and verify image metadata locally, with local-first video processing and an optional server fallback.
 
 ## Setup
 
@@ -20,6 +21,9 @@ To get started, clone the repo, install dependencies and run the development ser
 npm install
 npm run dev
 ```
+
+The server video fallback requires `ffmpeg` and `ffprobe`. When they are not on `PATH`, set `FFMPEG_PATH` and
+`FFPROBE_PATH`. The production Docker image installs both tools.
 
 ## Credits
 

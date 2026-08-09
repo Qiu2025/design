@@ -22,6 +22,8 @@ RUN npm run build
 FROM base AS runner
 WORKDIR /app
 
+RUN apk add --no-cache ffmpeg
+
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV SHLINK_BASE_URL=""
@@ -48,4 +50,3 @@ ENV PORT=4000
 ENV HOSTNAME="0.0.0.0"
 
 CMD ["node", "server.js"]
-

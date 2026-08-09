@@ -1,233 +1,121 @@
-import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile, unlink } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { extname, join } from "node:path";
 import { tmpdir } from "node:os";
-import { spawn } from "node:child_process";
-import { exiftool } from "exiftool-vendored";
-import {
-  isSupportedImageExtension,
-  isSupportedImageType,
-  isSupportedVideoExtension,
-  isSupportedVideoType,
-} from "@/utils/media";
+import { NextResponse } from "next/server";
+import { isSupportedVideoExtension, isSupportedVideoType, MAX_SERVER_VIDEO_BYTES } from "@/utils/media";
+import { inspectVideoMetadata } from "@/utils/server-video-metadata";
 
 export const runtime = "nodejs";
 
 const TEMP_DIRECTORY = join(tmpdir(), "snapbox-metadata-inspect");
+const REQUEST_OVERHEAD_BYTES = 2 * 1024 * 1024;
+const MAX_CONCURRENT_INSPECTIONS = 3;
 
-type InspectMode = "image" | "video";
-
-type MetadataEntry = {
-  id: string;
-  group: string;
-  label: string;
-  value: string;
-  key: string;
-  scope: "image" | "format" | "stream";
-  streamIndex?: number;
-};
-
-const isSupportedImage = (file: File) => isSupportedImageType(file.type) || isSupportedImageExtension(file.name);
-const isSupportedVideo = (file: File) => isSupportedVideoType(file.type) || isSupportedVideoExtension(file.name);
-
-const toStringValue = (value: unknown) => {
-  if (value === null || value === undefined) return null;
-  if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
-  if (value instanceof Date) return value.toISOString();
-  return null;
-};
-
-const SYSTEM_IMAGE_TAGS = new Set([
-  "SourceFile",
-  "FileName",
-  "Directory",
-  "FileSize",
-  "FileType",
-  "FileTypeExtension",
-  "MIMEType",
-  "ImageSize",
-  "Megapixels",
-  "ExifToolVersion",
-]);
-
-const getImageGroup = (key: string) => {
-  const lower = key.toLowerCase();
-  if (lower.includes("gps") || lower.includes("location")) return "Location";
-  if (lower.includes("date") || lower.includes("time")) return "Timestamps";
-  if (
-    lower.includes("camera") ||
-    lower.includes("lens") ||
-    lower.includes("focal") ||
-    lower.includes("exposure") ||
-    lower.includes("fnumber")
-  )
-    return "Camera";
-  if (lower.includes("copyright") || lower.includes("artist") || lower.includes("owner")) return "Ownership";
-  if (lower.includes("software") || lower.includes("creator") || lower.includes("maker")) return "Software";
-  if (lower.includes("icc") || lower.includes("profile") || lower.includes("color")) return "Color Profile";
-  return "Other";
-};
-
-const runCommand = (command: string, args: string[]) => {
-  return new Promise<string>((resolve, reject) => {
-    const processHandle = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
-    let stdout = "";
-    let stderr = "";
-
-    processHandle.stdout?.on("data", (chunk) => {
-      stdout += chunk.toString();
-    });
-
-    processHandle.stderr?.on("data", (chunk) => {
-      stderr += chunk.toString();
-    });
-
-    processHandle.on("error", (error) => reject(error));
-    processHandle.on("close", (code) => {
-      if (code === 0) {
-        resolve(stdout);
-      } else {
-        reject(new Error(stderr || `Command failed with code ${code}`));
-      }
-    });
-  });
-};
-
-const inspectImage = async (filePath: string) => {
-  const tags = await exiftool.read(filePath);
-  const entries: MetadataEntry[] = [];
-
-  Object.entries(tags).forEach(([key, value]) => {
-    if (SYSTEM_IMAGE_TAGS.has(key)) {
-      return;
-    }
-
-    const stringValue = toStringValue(value);
-
-    if (!stringValue) {
-      return;
-    }
-
-    entries.push({
-      id: `image:${key}`,
-      group: getImageGroup(key),
-      label: key,
-      value: stringValue,
-      key,
-      scope: "image",
-    });
-  });
-
-  return entries.sort((a, b) => a.group.localeCompare(b.group) || a.label.localeCompare(b.label));
-};
-
-const inspectVideo = async (filePath: string) => {
-  const ffprobeBinary = process.env.FFPROBE_PATH || "ffprobe";
-  const output = await runCommand(ffprobeBinary, [
-    "-v",
-    "error",
-    "-print_format",
-    "json",
-    "-show_format",
-    "-show_streams",
-    filePath,
-  ]);
-
-  const parsed = JSON.parse(output) as {
-    format?: { tags?: Record<string, string> };
-    streams?: Array<{ index: number; codec_type?: string; tags?: Record<string, string> }>;
-  };
-
-  const entries: MetadataEntry[] = [];
-
-  const formatTags = parsed.format?.tags || {};
-  Object.entries(formatTags).forEach(([key, value]) => {
-    const stringValue = toStringValue(value);
-    if (!stringValue) return;
-    entries.push({
-      id: `format:${key}`,
-      group: "Container",
-      label: key,
-      value: stringValue,
-      key,
-      scope: "format",
-    });
-  });
-
-  (parsed.streams || []).forEach((stream, idx) => {
-    const streamTags = stream.tags || {};
-    const typeLabel = stream.codec_type ? stream.codec_type.toUpperCase() : "STREAM";
-    const group = `${typeLabel} Stream ${idx + 1}`;
-
-    Object.entries(streamTags).forEach(([key, value]) => {
-      const stringValue = toStringValue(value);
-      if (!stringValue) return;
-      entries.push({
-        id: `stream:${stream.index}:${key}`,
-        group,
-        label: key,
-        value: stringValue,
-        key,
-        scope: "stream",
-        streamIndex: stream.index,
-      });
-    });
-  });
-
-  return entries.sort((a, b) => a.group.localeCompare(b.group) || a.label.localeCompare(b.label));
-};
+let activeInspections = 0;
 
 const safeUnlink = async (filePath: string) => {
   try {
     await unlink(filePath);
   } catch {
-    // ignore cleanup failures
+    // The response must not be held up by an already-removed temporary file.
   }
 };
 
+const getSizeBucket = (bytes: number) => {
+  const megabytes = bytes / (1024 * 1024);
+  if (megabytes < 10) return "under_10_mb";
+  if (megabytes < 50) return "10_50_mb";
+  if (megabytes < 100) return "50_100_mb";
+  return "100_250_mb";
+};
+
+const getContainer = (fileName: string) => extname(fileName).slice(1).toLowerCase() || "unknown";
+
+const logMetric = (metric: Record<string, string | number>) => {
+  console.info("[metadata]", JSON.stringify(metric));
+};
+
+const getErrorCode = (detail: string) => {
+  if (detail.includes("ENOENT") || detail.includes("not found")) return "ffprobe_unavailable";
+  if (detail.includes("timed out")) return "timeout";
+  return "inspection_failed";
+};
+
 export async function POST(request: Request) {
+  const contentLength = Number(request.headers.get("content-length") || 0);
+
+  if (contentLength > MAX_SERVER_VIDEO_BYTES + REQUEST_OVERHEAD_BYTES) {
+    return NextResponse.json({ error: "Video exceeds the 250 MB server limit." }, { status: 413 });
+  }
+
+  if (activeInspections >= MAX_CONCURRENT_INSPECTIONS) {
+    return NextResponse.json({ error: "The video server is busy. Please try again shortly." }, { status: 503 });
+  }
+
+  const startedAt = Date.now();
   let inputPath = "";
+  let fileSize = 0;
+  let container = "unknown";
+  activeInspections += 1;
 
   try {
     const formData = await request.formData();
     const file = formData.get("file");
-    const mode = formData.get("mode") as InspectMode | null;
 
     if (!(file instanceof File)) {
-      return NextResponse.json({ error: "Missing file." }, { status: 400 });
+      return NextResponse.json({ error: "Missing video file." }, { status: 400 });
     }
 
-    if (!mode || (mode !== "image" && mode !== "video")) {
-      return NextResponse.json({ error: "Missing or invalid mode." }, { status: 400 });
+    fileSize = file.size;
+    container = getContainer(file.name);
+
+    if (!isSupportedVideoType(file.type) && !isSupportedVideoExtension(file.name)) {
+      return NextResponse.json({ error: "This video container is not supported by the server." }, { status: 400 });
     }
 
-    if (mode === "image" && !isSupportedImage(file)) {
-      return NextResponse.json({ error: "Unsupported image format." }, { status: 400 });
-    }
-
-    if (mode === "video" && !isSupportedVideo(file)) {
-      return NextResponse.json({ error: "Unsupported video format." }, { status: 400 });
+    if (file.size > MAX_SERVER_VIDEO_BYTES) {
+      return NextResponse.json({ error: "Video exceeds the 250 MB server limit." }, { status: 413 });
     }
 
     await mkdir(TEMP_DIRECTORY, { recursive: true });
+    inputPath = join(TEMP_DIRECTORY, `${randomUUID()}${extname(file.name)}`);
+    await writeFile(inputPath, Buffer.from(await file.arrayBuffer()));
 
-    const extension = file.name.includes(".") ? file.name.slice(file.name.lastIndexOf(".")) : "";
-    inputPath = join(TEMP_DIRECTORY, `${randomUUID()}${extension || ""}`);
+    const entries = await inspectVideoMetadata(inputPath);
+    logMetric({
+      event: "server_video_inspect",
+      container,
+      sizeRange: getSizeBucket(fileSize),
+      durationMs: Date.now() - startedAt,
+      result: "success",
+    });
 
-    const inputBuffer = Buffer.from(await file.arrayBuffer());
-    await writeFile(inputPath, inputBuffer);
-
-    const entries = mode === "image" ? await inspectImage(inputPath) : await inspectVideo(inputPath);
-
-    return NextResponse.json({ entries });
+    return NextResponse.json({ entries }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json({ error: `Unable to inspect metadata: ${detail}` }, { status: 500 });
-  } finally {
-    if (inputPath) {
-      await safeUnlink(inputPath);
+    const errorCode = getErrorCode(detail);
+
+    logMetric({
+      event: "server_video_inspect",
+      container,
+      sizeRange: getSizeBucket(fileSize),
+      durationMs: Date.now() - startedAt,
+      result: "error",
+      errorCode,
+    });
+
+    if (errorCode === "ffprobe_unavailable") {
+      return NextResponse.json({ error: "Video inspection is not available on this server." }, { status: 503 });
     }
+
+    if (errorCode === "timeout") {
+      return NextResponse.json({ error: "Video inspection timed out." }, { status: 504 });
+    }
+
+    return NextResponse.json({ error: "The server could not inspect this video container." }, { status: 422 });
+  } finally {
+    activeInspections -= 1;
+    if (inputPath) await safeUnlink(inputPath);
   }
 }

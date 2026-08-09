@@ -21,12 +21,15 @@ export function InfoDialog() {
         <div className="grid gap-8 md:grid-cols-2">
           <div className="flex flex-col gap-3 text-[13px] text-gray-11 leading-relaxed">
             <DialogTitle>About</DialogTitle>
-            <p>Metadata Remover is a tool to remove metadata from images and videos.</p>
+            <p>Metadata Remover cleans one image or video at a time and verifies the result before download.</p>
             <p>
-              Upload an image or video, and the tool will automatically extract all metadata information. Once
-              you&apos;ve reviewed what will be removed, click remove metadata to download a clean version of your file.
+              Images always stay on your device. Videos use the local engine by default; the optional server fallback
+              never uploads a file without explicit consent and accepts up to 250 MB.
             </p>
-            <p>Supports images in JPEG, PNG, WebP, BMP, GIF, TIFF, and SVG formats, as well as common video formats.</p>
+            <p>
+              JPEG, PNG and WebP are supported locally. GIF, TIFF, BMP and SVG are exported only when their format,
+              animation or vector behavior can be preserved.
+            </p>
             <a
               href="https://github.com/Qiu2025/snap-box"
               className="inline-flex w-fit items-center gap-2 text-gray-12 underline underline-offset-2"
@@ -34,6 +37,18 @@ export function InfoDialog() {
               <BrandGithubIcon className="h-4 w-4" />
               github.com/Qiu2025/snap-box
             </a>
+          </div>
+          <div className="flex flex-col gap-3 text-[13px] text-gray-11 leading-relaxed">
+            <DialogTitle>What is protected</DialogTitle>
+            <p>
+              Orientation, color profiles, animation, playback information and stream structure are protected so the
+              cleaned file continues to look and work correctly.
+            </p>
+            <p>
+              SnapBox reports fields it removed, preserved or could not resolve. It does not inspect pixels, audio,
+              subtitles, attachments or other media content.
+            </p>
+            <p>Files exist only in memory during the page session. Reloading, closing or removing a file forgets it.</p>
           </div>
         </div>
       </DialogContent>

@@ -21,7 +21,7 @@ export const VIDEO_MIME_TYPES = [
   "video/ogg",
 ] as const;
 
-export const MAX_VIDEO_BYTES = 500 * 1024 * 1024;
+export const MAX_SERVER_VIDEO_BYTES = 250 * 1024 * 1024;
 
 export const isSupportedImageType = (type: string) => {
   return IMAGE_MIME_TYPES.includes(type as (typeof IMAGE_MIME_TYPES)[number]);

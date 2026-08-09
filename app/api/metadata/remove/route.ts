@@ -1,228 +1,198 @@
-import { NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile, readFile, unlink } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { basename, extname, join } from "node:path";
 import { tmpdir } from "node:os";
-import { spawn, type ChildProcess } from "node:child_process";
-import { exiftool } from "exiftool-vendored";
+import { NextResponse } from "next/server";
 import {
   getOutputFileName,
-  isSupportedImageExtension,
-  isSupportedImageType,
   isSupportedVideoExtension,
   isSupportedVideoType,
-  MAX_VIDEO_BYTES,
+  MAX_SERVER_VIDEO_BYTES,
 } from "@/utils/media";
+import { metadataEntryMatches, type SelectedMetadataEntry } from "@/utils/metadata";
+import { findUnresolvedMetadata, inspectVideoMetadata, removeVideoMetadata } from "@/utils/server-video-metadata";
 
 export const runtime = "nodejs";
 
 const TEMP_DIRECTORY = join(tmpdir(), "snapbox-metadata-remove");
+const REQUEST_OVERHEAD_BYTES = 2 * 1024 * 1024;
+const MAX_CONCURRENT_JOBS = 3;
+const MAX_SELECTIONS = 500;
 
-type RemoveMode = "image" | "video";
-
-type SelectedEntry = {
-  scope: "image" | "format" | "stream";
-  key: string;
-  streamIndex?: number;
-};
-
-const runCommand = (command: string, args: string[]) => {
-  return new Promise<void>((resolve, reject) => {
-    let settled = false;
-    let processHandle: ChildProcess;
-    try {
-      processHandle = spawn(command, args, { stdio: ["ignore", "ignore", "pipe"] });
-    } catch (error) {
-      reject(error);
-      return;
-    }
-
-    let stderr = "";
-    processHandle.stderr?.on("data", (chunk) => {
-      stderr += chunk.toString();
-    });
-
-    processHandle.on("error", (error) => {
-      if (!settled) {
-        settled = true;
-        reject(error);
-      }
-    });
-
-    processHandle.on("close", (code) => {
-      if (!settled) {
-        settled = true;
-        if (code === 0) {
-          resolve();
-        } else {
-          reject(new Error(stderr || `Command failed with code ${code}`));
-        }
-      }
-    });
-  });
-};
-
-const inspectVideoTags = async (filePath: string) => {
-  const ffprobeBinary = process.env.FFPROBE_PATH || "ffprobe";
-  const output = await new Promise<string>((resolve, reject) => {
-    const processHandle = spawn(ffprobeBinary, [
-      "-v",
-      "error",
-      "-print_format",
-      "json",
-      "-show_format",
-      "-show_streams",
-      filePath,
-    ]);
-
-    let stdout = "";
-    let stderr = "";
-
-    processHandle.stdout?.on("data", (chunk) => (stdout += chunk.toString()));
-    processHandle.stderr?.on("data", (chunk) => (stderr += chunk.toString()));
-
-    processHandle.on("error", (error) => reject(error));
-    processHandle.on("close", (code) => {
-      if (code === 0) {
-        resolve(stdout);
-      } else {
-        reject(new Error(stderr || `ffprobe exited with code ${code}`));
-      }
-    });
-  });
-
-  return JSON.parse(output) as {
-    format?: { tags?: Record<string, string> };
-    streams?: Array<{ index: number; tags?: Record<string, string> }>;
-  };
-};
+let activeJobs = 0;
 
 const safeUnlink = async (filePath: string) => {
   try {
     await unlink(filePath);
   } catch {
-    // ignore cleanup failures
+    // The response must not be held up by an already-removed temporary file.
   }
 };
 
-const removeImageMetadata = async (filePath: string, selected: SelectedEntry[]) => {
-  const deleteMap: Record<string, null> = {};
-
-  selected
-    .filter((entry) => entry.scope === "image")
-    .forEach((entry) => {
-      deleteMap[entry.key] = null;
-    });
-
-  if (Object.keys(deleteMap).length === 0) {
-    return;
-  }
-
-  await exiftool.write(filePath, deleteMap, ["-overwrite_original", "-ignoreMinorErrors"]);
+const isSelectedEntry = (value: unknown): value is SelectedMetadataEntry => {
+  if (!value || typeof value !== "object") return false;
+  const entry = value as Record<string, unknown>;
+  const validScope = entry.scope === "format" || entry.scope === "stream" || entry.scope === "chapter";
+  const validKey = typeof entry.key === "string" && entry.key.length > 0 && entry.key.length <= 128;
+  const validStream =
+    entry.streamIndex === undefined || (Number.isInteger(entry.streamIndex) && Number(entry.streamIndex) >= 0);
+  const validChapter =
+    entry.chapterIndex === undefined || (Number.isInteger(entry.chapterIndex) && Number(entry.chapterIndex) >= 0);
+  return validScope && validKey && validStream && validChapter;
 };
 
-const removeVideoMetadata = async (inputPath: string, outputPath: string, selected: SelectedEntry[]) => {
-  const ffmpegBinary = process.env.FFMPEG_PATH || "ffmpeg";
-  const probeData = await inspectVideoTags(inputPath);
+const parseSelection = (raw: FormDataEntryValue | null) => {
+  if (typeof raw !== "string") return [];
+  const parsed: unknown = JSON.parse(raw);
+  if (!Array.isArray(parsed) || parsed.length > MAX_SELECTIONS || !parsed.every(isSelectedEntry)) {
+    throw new Error("invalid_selection");
+  }
+  return parsed;
+};
 
-  const selectedFormatKeys = new Set(selected.filter((entry) => entry.scope === "format").map((entry) => entry.key));
-  const selectedStreamKeys = new Set(
-    selected.filter((entry) => entry.scope === "stream").map((entry) => `${entry.streamIndex ?? -1}:${entry.key}`),
-  );
+const getSizeBucket = (bytes: number) => {
+  const megabytes = bytes / (1024 * 1024);
+  if (megabytes < 10) return "under_10_mb";
+  if (megabytes < 50) return "10_50_mb";
+  if (megabytes < 100) return "50_100_mb";
+  return "100_250_mb";
+};
 
-  const args = ["-y", "-i", inputPath, "-map", "0", "-map_metadata", "-1", "-map_chapters", "-1", "-c", "copy"];
+const getContainer = (fileName: string) => extname(fileName).slice(1).toLowerCase() || "unknown";
 
-  const formatTags = probeData.format?.tags || {};
-  Object.entries(formatTags).forEach(([key, value]) => {
-    if (selectedFormatKeys.has(key)) return;
-    args.push("-metadata", `${key}=${value}`);
-  });
+const logMetric = (metric: Record<string, string | number>) => {
+  console.info("[metadata]", JSON.stringify(metric));
+};
 
-  (probeData.streams || []).forEach((stream) => {
-    const tags = stream.tags || {};
-    Object.entries(tags).forEach(([key, value]) => {
-      if (selectedStreamKeys.has(`${stream.index}:${key}`)) return;
-      args.push(`-metadata:s:${stream.index}`, `${key}=${value}`);
-    });
-  });
+const getErrorCode = (detail: string) => {
+  if (detail === "invalid_selection") return "invalid_selection";
+  if (detail.includes("ENOENT") || detail.includes("not found")) return "ffmpeg_unavailable";
+  if (detail.includes("timed out")) return "timeout";
+  return "processing_failed";
+};
 
-  args.push(outputPath);
-
-  await runCommand(ffmpegBinary, args);
+const encodeVerification = (unresolved: SelectedMetadataEntry[]) => {
+  return Buffer.from(JSON.stringify(unresolved.slice(0, MAX_SELECTIONS))).toString("base64url");
 };
 
 export async function POST(request: Request) {
+  const contentLength = Number(request.headers.get("content-length") || 0);
+
+  if (contentLength > MAX_SERVER_VIDEO_BYTES + REQUEST_OVERHEAD_BYTES) {
+    return NextResponse.json({ error: "Video exceeds the 250 MB server limit." }, { status: 413 });
+  }
+
+  if (activeJobs >= MAX_CONCURRENT_JOBS) {
+    return NextResponse.json({ error: "The video server is busy. Please try again shortly." }, { status: 503 });
+  }
+
+  const startedAt = Date.now();
   let inputPath = "";
   let outputPath = "";
+  let fileSize = 0;
+  let container = "unknown";
+  activeJobs += 1;
 
   try {
     const formData = await request.formData();
     const file = formData.get("file");
-    const mode = formData.get("mode") as RemoveMode | null;
-    const selectedRaw = formData.get("selected");
 
     if (!(file instanceof File)) {
-      return NextResponse.json({ error: "Missing file." }, { status: 400 });
+      return NextResponse.json({ error: "Missing video file." }, { status: 400 });
     }
 
-    if (!mode || (mode !== "image" && mode !== "video")) {
-      return NextResponse.json({ error: "Missing or invalid mode." }, { status: 400 });
+    fileSize = file.size;
+    container = getContainer(file.name);
+
+    if (!isSupportedVideoType(file.type) && !isSupportedVideoExtension(file.name)) {
+      return NextResponse.json({ error: "This video container is not supported by the server." }, { status: 400 });
     }
 
-    const selected = selectedRaw ? (JSON.parse(String(selectedRaw)) as SelectedEntry[]) : [];
-
-    if (selected.length === 0) {
-      return NextResponse.json({ error: "No metadata fields selected." }, { status: 400 });
+    if (file.size > MAX_SERVER_VIDEO_BYTES) {
+      return NextResponse.json({ error: "Video exceeds the 250 MB server limit." }, { status: 413 });
     }
 
-    if (mode === "image" && !isSupportedImageType(file.type) && !isSupportedImageExtension(file.name)) {
-      return NextResponse.json({ error: "Unsupported image format." }, { status: 400 });
-    }
-
-    if (mode === "video" && !isSupportedVideoType(file.type) && !isSupportedVideoExtension(file.name)) {
-      return NextResponse.json({ error: "Unsupported video format." }, { status: 400 });
-    }
-
-    if (mode === "video" && file.size > MAX_VIDEO_BYTES) {
-      return NextResponse.json(
-        { error: `File exceeds ${Math.round(MAX_VIDEO_BYTES / (1024 * 1024))} MB limit.` },
-        { status: 400 },
-      );
+    const requestedSelection = parseSelection(formData.get("selected"));
+    if (requestedSelection.length === 0) {
+      return NextResponse.json({ error: "No metadata fields were selected." }, { status: 400 });
     }
 
     await mkdir(TEMP_DIRECTORY, { recursive: true });
+    const extension = extname(file.name);
+    const operationId = randomUUID();
+    inputPath = join(TEMP_DIRECTORY, `${operationId}-input${extension}`);
+    outputPath = join(TEMP_DIRECTORY, `${operationId}-output${extension}`);
+    await writeFile(inputPath, Buffer.from(await file.arrayBuffer()));
 
-    const extension = extname(file.name) || "";
-    const uniqueId = randomUUID();
-    inputPath = join(TEMP_DIRECTORY, `${uniqueId}-input${extension}`);
-    outputPath = join(TEMP_DIRECTORY, `${uniqueId}-output${extension}`);
+    const before = await inspectVideoMetadata(inputPath);
+    const allowedSelection = requestedSelection.filter((requested) =>
+      before.some((entry) => !entry.protected && metadataEntryMatches(entry, requested)),
+    );
 
-    const inputBuffer = Buffer.from(await file.arrayBuffer());
-    await writeFile(inputPath, inputBuffer);
-    await writeFile(outputPath, inputBuffer);
-
-    if (mode === "image") {
-      await removeImageMetadata(outputPath, selected);
-    } else {
-      await removeVideoMetadata(inputPath, outputPath, selected);
+    if (allowedSelection.length === 0) {
+      return NextResponse.json({ error: "The selected metadata is not removable." }, { status: 400 });
     }
 
+    await removeVideoMetadata(inputPath, outputPath, before, allowedSelection);
+    const after = await inspectVideoMetadata(outputPath);
+    const unresolvedEntries = findUnresolvedMetadata(before, after, allowedSelection);
+    const unresolved = unresolvedEntries.map(({ scope, key, streamIndex, chapterIndex }) => ({
+      scope,
+      key,
+      streamIndex,
+      chapterIndex,
+    }));
     const outputBuffer = await readFile(outputPath);
     const outputName = getOutputFileName(basename(file.name), "clean");
+
+    logMetric({
+      event: "server_video_clean",
+      container,
+      sizeRange: getSizeBucket(fileSize),
+      durationMs: Date.now() - startedAt,
+      result: unresolved.length === 0 ? "verified" : "unresolved",
+    });
 
     return new NextResponse(outputBuffer, {
       status: 200,
       headers: {
         "Content-Type": file.type || "application/octet-stream",
-        "Content-Disposition": `attachment; filename=\"${outputName}\"`,
-        "X-Output-File": outputName,
+        "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(outputName)}`,
+        "X-Output-File": encodeURIComponent(outputName),
+        "X-Metadata-Verification": encodeVerification(unresolved),
+        "X-Metadata-Removed-Count": String(allowedSelection.length - unresolved.length),
+        "X-Metadata-Unresolved-Count": String(unresolved.length),
         "Cache-Control": "no-store",
       },
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json({ error: `Unable to remove metadata: ${detail}` }, { status: 500 });
+    const errorCode = getErrorCode(detail);
+
+    logMetric({
+      event: "server_video_clean",
+      container,
+      sizeRange: getSizeBucket(fileSize),
+      durationMs: Date.now() - startedAt,
+      result: "error",
+      errorCode,
+    });
+
+    if (errorCode === "invalid_selection") {
+      return NextResponse.json({ error: "Invalid metadata selection." }, { status: 400 });
+    }
+
+    if (errorCode === "ffmpeg_unavailable") {
+      return NextResponse.json({ error: "Video processing is not available on this server." }, { status: 503 });
+    }
+
+    if (errorCode === "timeout") {
+      return NextResponse.json({ error: "Video processing timed out." }, { status: 504 });
+    }
+
+    return NextResponse.json({ error: "The video could not be cleaned without converting it." }, { status: 422 });
   } finally {
+    activeJobs -= 1;
     if (inputPath) await safeUnlink(inputPath);
     if (outputPath) await safeUnlink(outputPath);
   }
