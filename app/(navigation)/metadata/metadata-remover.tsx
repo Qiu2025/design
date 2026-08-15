@@ -725,7 +725,7 @@ export function MetadataRemover() {
         {(hasNothingToClean || hasNoDetectedMetadata) && (
           <div className={cn(styles.feedback, styles.feedbackSuccess)}>
             <CheckCircleIcon className={cn("h-4 w-4", styles.feedbackIcon)} />
-            This file already appears clean. SnapBox will not create an unnecessary copy.
+            This file already appears clean
           </div>
         )}
 
@@ -826,10 +826,6 @@ export function MetadataRemover() {
             ? "Local processing: this file is never uploaded or stored persistently."
             : "Server fallback uploads only after consent and removes temporary files after the response."}
         </div>
-        <p className={styles.disclaimer}>
-          SnapBox does not inspect or censor pixels, audio, subtitles, attachments or other media content. A filename
-          can also reveal information.
-        </p>
       </main>
     </>
   );
