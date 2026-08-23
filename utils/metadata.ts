@@ -8,6 +8,7 @@ export type MetadataEntry = {
   id: string;
   group: string;
   label: string;
+  sourceLabel: string;
   value: string;
   key: string;
   scope: MetadataScope;
@@ -16,6 +17,40 @@ export type MetadataEntry = {
   sensitivity: MetadataSensitivity;
   protected: boolean;
   protectionReason?: string;
+};
+
+const VIDEO_STREAM_SOURCE_NAMES: Record<string, string> = {
+  audio: "Audio",
+  attachment: "Attachment",
+  data: "Data",
+  subtitle: "Subtitle",
+  video: "Video",
+};
+
+const MOV_FAMILY_VIDEO_CONTAINERS = new Set(["3g2", "3gp", "m4a", "m4v", "mov", "mp4"]);
+
+export const isMovFamilyVideoContainer = (container: string) =>
+  MOV_FAMILY_VIDEO_CONTAINERS.has(container.trim().replace(/^\./, "").toLowerCase());
+
+export const isSyntheticVideoMetadata = (container: string, scope: MetadataScope, key: string) =>
+  isMovFamilyVideoContainer(container) && scope === "stream" && key.trim().toLowerCase() === "vendor_id";
+
+export const getVideoStreamSourceLabels = (codecTypes: Array<string | undefined>) => {
+  const sourceKeys = codecTypes.map((codecType) => {
+    const normalizedType = codecType?.trim().toLowerCase() || "track";
+    return VIDEO_STREAM_SOURCE_NAMES[normalizedType] ? normalizedType : "track";
+  });
+  const totals = new Map<string, number>();
+  const occurrences = new Map<string, number>();
+
+  sourceKeys.forEach((sourceKey) => totals.set(sourceKey, (totals.get(sourceKey) || 0) + 1));
+
+  return sourceKeys.map((sourceKey) => {
+    const sourceName = VIDEO_STREAM_SOURCE_NAMES[sourceKey] || "Track";
+    const occurrence = (occurrences.get(sourceKey) || 0) + 1;
+    occurrences.set(sourceKey, occurrence);
+    return (totals.get(sourceKey) || 0) > 1 ? `${sourceName} ${occurrence}` : sourceName;
+  });
 };
 
 export type SelectedMetadataEntry = Pick<MetadataEntry, "scope" | "key" | "streamIndex" | "chapterIndex">;
@@ -158,6 +193,15 @@ const PREVIEW_PATTERNS = ["thumbnail", "preview", "jpgfromraw", "otherimage", "s
 
 export const classifyMetadata = (group: string, key: string, scope: MetadataScope) => {
   const haystack = normalize(`${group} ${key}`);
+
+  if (scope === "stream" && normalize(key) === "handlername") {
+    return {
+      group: "Required for playback or display",
+      sensitivity: "functional" as const,
+      protected: true,
+      protectionReason: "Preserved because players can use it to identify the track.",
+    };
+  }
 
   if (matchesAny(haystack, FUNCTIONAL_PATTERNS)) {
     return {

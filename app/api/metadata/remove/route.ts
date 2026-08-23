@@ -10,7 +10,13 @@ import {
   MAX_SERVER_VIDEO_BYTES,
 } from "@/utils/media";
 import { metadataEntryMatches, type SelectedMetadataEntry } from "@/utils/metadata";
-import { findUnresolvedMetadata, inspectVideoMetadata, removeVideoMetadata } from "@/utils/server-video-metadata";
+import { getMetadataContainer, getMetadataSizeRange, logServerMetadataEvent } from "@/utils/server-metadata-logging";
+import {
+  findUnresolvedMetadata,
+  inspectVideoMetadata,
+  removeVideoMetadata,
+  VideoCommandError,
+} from "@/utils/server-video-metadata";
 
 export const runtime = "nodejs";
 
@@ -50,24 +56,10 @@ const parseSelection = (raw: FormDataEntryValue | null) => {
   return parsed;
 };
 
-const getSizeBucket = (bytes: number) => {
-  const megabytes = bytes / (1024 * 1024);
-  if (megabytes < 10) return "under_10_mb";
-  if (megabytes < 50) return "10_50_mb";
-  if (megabytes < 100) return "50_100_mb";
-  return "100_250_mb";
-};
-
-const getContainer = (fileName: string) => extname(fileName).slice(1).toLowerCase() || "unknown";
-
-const logMetric = (metric: Record<string, string | number>) => {
-  console.info("[metadata]", JSON.stringify(metric));
-};
-
-const getErrorCode = (detail: string) => {
-  if (detail === "invalid_selection") return "invalid_selection";
-  if (detail.includes("ENOENT") || detail.includes("not found")) return "ffmpeg_unavailable";
-  if (detail.includes("timed out")) return "timeout";
+const getErrorCode = (error: unknown) => {
+  if (error instanceof Error && error.message === "invalid_selection") return "invalid_selection";
+  if (error instanceof VideoCommandError && error.kind === "unavailable") return "ffmpeg_unavailable";
+  if (error instanceof VideoCommandError && error.kind === "timeout") return "timeout";
   return "processing_failed";
 };
 
@@ -102,7 +94,7 @@ export async function POST(request: Request) {
     }
 
     fileSize = file.size;
-    container = getContainer(file.name);
+    container = getMetadataContainer(file.name);
 
     if (!isSupportedVideoType(file.type) && !isSupportedVideoExtension(file.name)) {
       return NextResponse.json({ error: "This video container is not supported by the server." }, { status: 400 });
@@ -124,7 +116,7 @@ export async function POST(request: Request) {
     outputPath = join(TEMP_DIRECTORY, `${operationId}-output${extension}`);
     await writeFile(inputPath, Buffer.from(await file.arrayBuffer()));
 
-    const before = await inspectVideoMetadata(inputPath);
+    const before = await inspectVideoMetadata(inputPath, "probe_before");
     const allowedSelection = requestedSelection.filter((requested) =>
       before.some((entry) => !entry.protected && metadataEntryMatches(entry, requested)),
     );
@@ -133,8 +125,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "The selected metadata is not removable." }, { status: 400 });
     }
 
+    if (allowedSelection.length !== requestedSelection.length) {
+      return NextResponse.json(
+        { error: "The metadata changed. Inspect the video again before cleaning it." },
+        { status: 409 },
+      );
+    }
+
     await removeVideoMetadata(inputPath, outputPath, before, allowedSelection);
-    const after = await inspectVideoMetadata(outputPath);
+    const after = await inspectVideoMetadata(outputPath, "probe_after");
     const unresolvedEntries = findUnresolvedMetadata(before, after, allowedSelection);
     const unresolved = unresolvedEntries.map(({ scope, key, streamIndex, chapterIndex }) => ({
       scope,
@@ -145,10 +144,11 @@ export async function POST(request: Request) {
     const outputBuffer = await readFile(outputPath);
     const outputName = getOutputFileName(basename(file.name), "clean");
 
-    logMetric({
+    logServerMetadataEvent({
       event: "server_video_clean",
+      execution: "on_server",
       container,
-      sizeRange: getSizeBucket(fileSize),
+      sizeRange: getMetadataSizeRange(fileSize),
       durationMs: Date.now() - startedAt,
       result: unresolved.length === 0 ? "verified" : "unresolved",
     });
@@ -166,16 +166,21 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    const detail = error instanceof Error ? error.message : "Unknown error";
-    const errorCode = getErrorCode(detail);
+    const errorCode = getErrorCode(error);
+    const commandError = error instanceof VideoCommandError ? error : null;
 
-    logMetric({
+    logServerMetadataEvent({
       event: "server_video_clean",
+      execution: "on_server",
       container,
-      sizeRange: getSizeBucket(fileSize),
+      sizeRange: getMetadataSizeRange(fileSize),
       durationMs: Date.now() - startedAt,
       result: "error",
       errorCode,
+      stage: commandError?.stage || "request",
+      ...(commandError ? { tool: commandError.tool } : {}),
+      ...(commandError ? { reason: commandError.reason } : {}),
+      ...(commandError?.exitCode === undefined ? {} : { exitCode: commandError.exitCode }),
     });
 
     if (errorCode === "invalid_selection") {

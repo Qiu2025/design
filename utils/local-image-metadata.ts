@@ -85,6 +85,7 @@ const createImageEntry = (qualifiedKey: string, value: unknown): MetadataEntry |
     id: `image:${qualifiedKey}`,
     group: classification.group,
     label: key,
+    sourceLabel: sourceGroup || "Image",
     value: stringValue,
     key: qualifiedKey,
     scope: "image",

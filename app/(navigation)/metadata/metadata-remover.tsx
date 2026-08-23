@@ -2,22 +2,33 @@
 
 import {
   CheckCircleIcon,
-  ChevronDownIcon,
+  ChevronRightIcon,
   DownloadIcon,
   EraserIcon,
   FilmStripIcon,
   ImageIcon,
   LockIcon,
-  Shield01Icon,
+  MagnifyingGlassIcon,
   TrashIcon,
   UploadIcon,
   WarningIcon,
   XMarkCircleIcon,
 } from "@raycast/icons";
 import cn from "classnames";
-import { useCallback, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { Button } from "@/components/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/dialog";
+import { Input, InputSlot } from "@/components/input";
 import { NavigationActions } from "@/components/navigation";
+import { ScrollArea } from "@/components/scroll-area";
 import { cleanLocalImage, getLocalImageSupport, inspectLocalImage } from "@/utils/local-image-metadata";
 import { cleanLocalVideo, getLocalVideoSupport, inspectLocalVideo } from "@/utils/local-video-metadata";
 import {
@@ -48,6 +59,42 @@ const IMAGE_ACCEPT =
   ".jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.svg,image/jpeg,image/png,image/webp,image/gif,image/bmp,image/tiff,image/svg+xml";
 const VIDEO_ACCEPT =
   ".mp4,.mov,.webm,.mkv,.avi,.flv,.3gp,.ts,.mpg,.mpeg,.ogv,video/mp4,video/quicktime,video/webm,video/x-matroska,video/x-msvideo,video/x-flv,video/3gpp,video/mp2t,video/mpeg,video/ogg";
+const PROTECTED_METADATA_GROUP = "Required for playback or display";
+const TECHNICAL_METADATA_GROUPS = new Set(["Technical metadata", "Container and track metadata"]);
+
+const getMetadataGroupRank = (group: string) => {
+  if (group === PROTECTED_METADATA_GROUP) return 2;
+  if (TECHNICAL_METADATA_GROUPS.has(group)) return 1;
+  return 0;
+};
+
+const compareMetadataGroups = (left: string, right: string) => {
+  return getMetadataGroupRank(left) - getMetadataGroupRank(right) || left.localeCompare(right);
+};
+
+const normalizeMetadataLabel = (label: string) => label.trim().toLowerCase();
+
+const waitForInspectionPaint = () =>
+  new Promise<void>((resolve) => {
+    if (document.visibilityState !== "visible") {
+      resolve();
+      return;
+    }
+
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const fallback = window.setTimeout(finish, 64);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        window.clearTimeout(fallback);
+        finish();
+      });
+    });
+  });
 
 const formatBytes = (value: number) => {
   if (value < 1024) return `${value} B`;
@@ -104,79 +151,135 @@ export function MetadataRemover() {
   const [metadataError, setMetadataError] = useState<string | null>(null);
   const [metadataQuery, setMetadataQuery] = useState("");
   const [preset, setPreset] = useState<CleaningPreset>("safe");
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [activeGroup, setActiveGroup] = useState<string | null>(null);
+  const [inspectionComplete, setInspectionComplete] = useState(false);
   const [report, setReport] = useState<VerificationReport | null>(null);
   const [pendingDownload, setPendingDownload] = useState<PendingDownload | null>(null);
+  const [preserveWorkbenchDuringInspection, setPreserveWorkbenchDuringInspection] = useState(false);
+  const [inspectionRevision, setInspectionRevision] = useState(0);
+  const [serverConsentOpen, setServerConsentOpen] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
+  const serverConsentResolverRef = useRef<((granted: boolean) => void) | null>(null);
+  const serverConsentPromiseRef = useRef<Promise<boolean> | null>(null);
+  const inspectionRequestRef = useRef(0);
   const isBusy =
     processingState === "inspecting" || processingState === "uploading" || processingState === "processing";
   const selectedCount = selectedMetadata.size;
   const removableEntries = useMemo(() => metadataEntries.filter((entry) => !entry.protected), [metadataEntries]);
   const protectedCount = metadataEntries.length - removableEntries.length;
   const serverTooLarge = Boolean(file && file.size > MAX_SERVER_VIDEO_BYTES);
+  const duplicateMetadataLabels = useMemo(() => {
+    const counts = new Map<string, number>();
+    metadataEntries.forEach((entry) => {
+      const label = normalizeMetadataLabel(entry.label);
+      counts.set(label, (counts.get(label) || 0) + 1);
+    });
+    return new Set(
+      Array.from(counts.entries())
+        .filter(([, count]) => count > 1)
+        .map(([label]) => label),
+    );
+  }, [metadataEntries]);
 
   const filteredEntries = useMemo(() => {
     const query = metadataQuery.trim().toLowerCase();
     if (!query) return metadataEntries;
-    return metadataEntries.filter((entry) =>
-      [entry.label, entry.value, entry.group].some((value) => value.toLowerCase().includes(query)),
-    );
-  }, [metadataEntries, metadataQuery]);
+    return metadataEntries.filter((entry) => {
+      const searchableValues = [entry.label, entry.value, entry.group];
+      if (duplicateMetadataLabels.has(normalizeMetadataLabel(entry.label))) searchableValues.push(entry.sourceLabel);
+      return searchableValues.some((value) => value.toLowerCase().includes(query));
+    });
+  }, [duplicateMetadataLabels, metadataEntries, metadataQuery]);
 
   const groupedEntries = useMemo(() => {
     const groups = new Map<string, MetadataEntry[]>();
     filteredEntries.forEach((entry) => groups.set(entry.group, [...(groups.get(entry.group) || []), entry]));
-    return Array.from(groups.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    return Array.from(groups.entries()).sort((a, b) => compareMetadataGroups(a[0], b[0]));
   }, [filteredEntries]);
 
-  const clearInspection = useCallback(() => {
+  const metadataGroups = useMemo(() => {
+    const groups = new Map<string, MetadataEntry[]>();
+    metadataEntries.forEach((entry) => groups.set(entry.group, [...(groups.get(entry.group) || []), entry]));
+    return Array.from(groups.entries()).sort((a, b) => compareMetadataGroups(a[0], b[0]));
+  }, [metadataEntries]);
+
+  const visibleGroups = useMemo(() => {
+    if (metadataQuery.trim()) return groupedEntries;
+    const selectedGroup = metadataGroups.find(([group]) => group === activeGroup);
+    return selectedGroup ? [selectedGroup] : metadataGroups.slice(0, 1);
+  }, [activeGroup, groupedEntries, metadataGroups, metadataQuery]);
+
+  const clearInspection = useCallback((preserveWorkbench = false) => {
+    inspectionRequestRef.current += 1;
     setMetadataEntries([]);
     setSelectedMetadata(new Set());
     setMetadataError(null);
     setMetadataQuery("");
     setPreset("safe");
-    setDetailsOpen(false);
+    setActiveGroup(null);
+    setInspectionComplete(false);
     setReport(null);
     setPendingDownload(null);
     setProgress(0);
     setMessage(null);
     setError(null);
     setProcessingState("idle");
+    setPreserveWorkbenchDuringInspection(preserveWorkbench);
   }, []);
+
+  useEffect(
+    () => () => {
+      inspectionRequestRef.current += 1;
+    },
+    [],
+  );
 
   const applyInspectedEntries = useCallback((entries: MetadataEntry[]) => {
     setMetadataEntries(entries);
     setSelectedMetadata(getPresetSelection(entries, "safe"));
     setPreset("safe");
+    setActiveGroup(Array.from(new Set(entries.map((entry) => entry.group))).sort(compareMetadataGroups)[0] || null);
+    setInspectionComplete(true);
     setReport(null);
     setPendingDownload(null);
+    setPreserveWorkbenchDuringInspection(false);
+    setInspectionRevision((revision) => revision + 1);
   }, []);
 
   const inspectOnDevice = useCallback(
     async (nextFile: File, nextMode: MetadataMode) => {
+      const requestId = ++inspectionRequestRef.current;
       setProcessingState("inspecting");
       setMetadataError(null);
       setError(null);
+      await waitForInspectionPaint();
+      if (requestId !== inspectionRequestRef.current) return;
 
       try {
+        let entries: MetadataEntry[];
         if (nextMode === "image") {
           const support = getLocalImageSupport(nextFile);
           if (!support.supported) throw new Error(support.reason || "This image format is not supported.");
-          applyInspectedEntries(await inspectLocalImage(nextFile));
+          entries = await inspectLocalImage(nextFile);
+          if (requestId !== inspectionRequestRef.current) return;
           if (!support.guaranteed && support.reason) setMessage(support.reason);
         } else {
           const support = getLocalVideoSupport(nextFile);
           if (!support.supported) throw new Error(support.reason || "This video cannot be processed on this device.");
-          applyInspectedEntries(await inspectLocalVideo(nextFile));
+          entries = await inspectLocalVideo(nextFile);
+          if (requestId !== inspectionRequestRef.current) return;
         }
+        applyInspectedEntries(entries);
         setProcessingState("idle");
       } catch (inspectionError) {
+        if (requestId !== inspectionRequestRef.current) return;
         setMetadataEntries([]);
         setSelectedMetadata(new Set());
         setMetadataError(getErrorMessage(inspectionError, "The file could not be inspected on this device."));
         setProcessingState("error");
+        setPreserveWorkbenchDuringInspection(false);
       }
     },
     [applyInspectedEntries],
@@ -184,13 +287,19 @@ export function MetadataRemover() {
 
   const setSelectedFile = useCallback(
     (nextFile: File | null) => {
-      clearInspection();
+      const shouldPreserveWorkbench = Boolean(
+        nextFile &&
+          (mode === "image" || processingLocation === "local") &&
+          (metadataEntries.length > 0 || report !== null || pendingDownload !== null),
+      );
+      clearInspection(shouldPreserveWorkbench);
       setFile(nextFile);
       if (!nextFile) return;
 
       if (mode === "video" && !isSupportedVideoType(nextFile.type) && !isSupportedVideoExtension(nextFile.name)) {
         setMetadataError("This video format is not supported locally or by the server.");
         setProcessingState("error");
+        setPreserveWorkbenchDuringInspection(false);
         return;
       }
 
@@ -198,7 +307,7 @@ export function MetadataRemover() {
         void inspectOnDevice(nextFile, mode);
       }
     },
-    [clearInspection, inspectOnDevice, mode, processingLocation],
+    [clearInspection, inspectOnDevice, metadataEntries.length, mode, pendingDownload, processingLocation, report],
   );
 
   const changeMode = (nextMode: MetadataMode) => {
@@ -220,11 +329,11 @@ export function MetadataRemover() {
     }
   };
 
-  const requestServerConsent = () => {
-    if (serverConsentGranted) return true;
-    const granted = window.confirm(
-      "SnapBox will upload this video to process it, delete its temporary files after the response, and keep consent only for this browser session. Continue?",
-    );
+  const settleServerConsent = (granted: boolean) => {
+    const resolve = serverConsentResolverRef.current;
+    serverConsentResolverRef.current = null;
+    serverConsentPromiseRef.current = null;
+
     if (granted) {
       setServerConsentGranted(true);
       try {
@@ -233,7 +342,20 @@ export function MetadataRemover() {
         // In-memory consent still applies when session storage is unavailable.
       }
     }
-    return granted;
+    setServerConsentOpen(false);
+    resolve?.(granted);
+  };
+
+  const requestServerConsent = () => {
+    if (serverConsentGranted) return Promise.resolve(true);
+    if (serverConsentPromiseRef.current) return serverConsentPromiseRef.current;
+
+    const request = new Promise<boolean>((resolve) => {
+      serverConsentResolverRef.current = resolve;
+    });
+    serverConsentPromiseRef.current = request;
+    setServerConsentOpen(true);
+    return request;
   };
 
   const inspectOnServer = async () => {
@@ -242,7 +364,8 @@ export function MetadataRemover() {
       setMetadataError("This video exceeds the 250 MB server limit and will not be uploaded.");
       return;
     }
-    if (!requestServerConsent()) return;
+    const requestId = ++inspectionRequestRef.current;
+    if (!(await requestServerConsent()) || requestId !== inspectionRequestRef.current) return;
 
     setProcessingState("uploading");
     setMetadataError(null);
@@ -253,15 +376,18 @@ export function MetadataRemover() {
       formData.set("file", file);
       const response = await fetch("/api/metadata/inspect", { method: "POST", body: formData });
       const payload = (await response.json()) as { entries?: MetadataEntry[]; error?: string };
+      if (requestId !== inspectionRequestRef.current) return;
       if (!response.ok || !payload.entries)
         throw new Error(payload.error || "The server could not inspect this video.");
       applyInspectedEntries(payload.entries);
       setProcessingState("idle");
     } catch (inspectionError) {
+      if (requestId !== inspectionRequestRef.current) return;
       setMetadataEntries([]);
       setSelectedMetadata(new Set());
       setMetadataError(getErrorMessage(inspectionError, "The server could not inspect this video."));
       setProcessingState("error");
+      setPreserveWorkbenchDuringInspection(false);
     }
   };
 
@@ -270,6 +396,7 @@ export function MetadataRemover() {
     setSelectedMetadata(getPresetSelection(metadataEntries, nextPreset));
     setReport(null);
     setPendingDownload(null);
+    setMessage(null);
   };
 
   const toggleMetadataSelection = (entry: MetadataEntry) => {
@@ -277,6 +404,7 @@ export function MetadataRemover() {
     setPreset("custom");
     setReport(null);
     setPendingDownload(null);
+    setMessage(null);
     setSelectedMetadata((previous) => {
       const next = new Set(previous);
       if (next.has(entry.id)) next.delete(entry.id);
@@ -287,6 +415,9 @@ export function MetadataRemover() {
 
   const selectGroup = (entries: MetadataEntry[], selected: boolean) => {
     setPreset("custom");
+    setReport(null);
+    setPendingDownload(null);
+    setMessage(null);
     setSelectedMetadata((previous) => {
       const next = new Set(previous);
       entries
@@ -315,7 +446,7 @@ export function MetadataRemover() {
   const cleanOnServer = async (selectedEntries: MetadataEntry[]) => {
     if (!file) return;
     if (serverTooLarge) throw new Error("This video exceeds the 250 MB server limit and will not be uploaded.");
-    if (!requestServerConsent()) return;
+    if (!(await requestServerConsent())) return;
 
     setProcessingState("uploading");
     setProgress(0);
@@ -410,6 +541,7 @@ export function MetadataRemover() {
     event.preventDefault();
     event.stopPropagation();
     setDragging(false);
+    if (isBusy) return;
     const droppedFile = event.dataTransfer.files?.[0];
     if (droppedFile) setSelectedFile(droppedFile);
   };
@@ -420,411 +552,599 @@ export function MetadataRemover() {
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  const supportedFormats =
-    mode === "image"
-      ? "JPEG, PNG and WebP. GIF, TIFF, BMP and SVG when they can be preserved."
-      : "Compatibility depends on the container, browser and device.";
   const hasNothingToClean =
-    file && !isBusy && !metadataError && metadataEntries.length > 0 && removableEntries.length === 0;
-  const hasNoDetectedMetadata = file && !isBusy && !metadataError && metadataEntries.length === 0;
+    file &&
+    inspectionComplete &&
+    !isBusy &&
+    !metadataError &&
+    metadataEntries.length > 0 &&
+    removableEntries.length === 0;
+  const hasNoDetectedMetadata = file && inspectionComplete && !isBusy && !metadataError && metadataEntries.length === 0;
+  const waitingForServerInspection = Boolean(
+    file && mode === "video" && processingLocation === "server" && !inspectionComplete && !metadataError && !isBusy,
+  );
+  const showWorkbench =
+    metadataEntries.length > 0 ||
+    report !== null ||
+    pendingDownload !== null ||
+    (preserveWorkbenchDuringInspection && isBusy);
+  const isCleaning = isBusy && metadataEntries.length > 0;
 
   return (
     <>
+      <Dialog
+        open={serverConsentOpen}
+        onOpenChange={(open) => {
+          if (open) setServerConsentOpen(true);
+          else settleServerConsent(false);
+        }}
+      >
+        <DialogContent size="small">
+          <DialogHeader>
+            <DialogTitle>Upload this video?</DialogTitle>
+            <DialogDescription>
+              SnapBox will upload it for server processing and delete temporary files after the response. This choice is
+              remembered only for this browser session.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => settleServerConsent(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={() => settleServerConsent(true)}>
+              Continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <NavigationActions>
         <InfoDialog />
         <Button
           onClick={removeSelectedMetadata}
           disabled={isBusy || !file || selectedCount === 0 || (processingLocation === "server" && serverTooLarge)}
           variant="primary"
+          className={styles.cleanButton}
+          aria-label={isCleaning ? "Cleaning file" : "Clean file"}
+          aria-busy={isCleaning}
         >
           <EraserIcon className="h-4 w-4" />
-          {isBusy && processingState !== "inspecting"
-            ? "Cleaning…"
-            : `Clean file${selectedCount ? ` (${selectedCount})` : ""}`}
+          <span className={styles.cleanButtonLabel}>Clean file</span>
         </Button>
       </NavigationActions>
 
       <main className={styles.container}>
-        <header className={styles.header}>
-          <h1 className={styles.title}>Remove metadata from your files</h1>
-          <p className={styles.subtitle}>Guided privacy cleaning with a detailed, verifiable report.</p>
-        </header>
-
-        <div className={styles.modeToggle} aria-label="File type">
-          <button
-            type="button"
-            onClick={() => changeMode("image")}
-            className={cn(styles.modeButton, mode === "image" && styles.modeButtonActive)}
-          >
-            <ImageIcon className="h-4 w-4" /> Image
-          </button>
-          <button
-            type="button"
-            onClick={() => changeMode("video")}
-            className={cn(styles.modeButton, mode === "video" && styles.modeButtonActive)}
-          >
-            <FilmStripIcon className="h-4 w-4" /> Video
-          </button>
-        </div>
-
-        {mode === "video" && (
-          <section className={styles.processingChooser} aria-label="Video processing location">
-            <button
-              type="button"
-              className={cn(styles.processingOption, processingLocation === "local" && styles.processingOptionActive)}
-              onClick={() => changeProcessingLocation("local")}
-            >
-              <span className={styles.processingOptionTitle}>On this device</span>
-              <span className={styles.processingBadge}>Recommended</span>
-              <span className={styles.processingOptionText}>No upload. Compatibility depends on this device.</span>
-            </button>
-            <button
-              type="button"
-              className={cn(
-                styles.processingOption,
-                processingLocation === "server" && styles.processingOptionActive,
-                processingLocation === "local" && metadataError && file && styles.processingOptionSuggested,
-              )}
-              onClick={() => changeProcessingLocation("server")}
-            >
-              <span className={styles.processingOptionTitle}>Server fallback</span>
-              <span className={styles.processingOptionText}>Explicit consent required. Maximum 250 MB.</span>
-            </button>
-          </section>
-        )}
-
-        <div
-          ref={dropZoneRef}
-          className={cn(styles.dropZone, dragging && styles.dropZoneDragging, file && styles.dropZoneHasFile)}
-          onDragEnter={(event) => {
-            event.preventDefault();
-            setDragging(true);
-          }}
-          onDragOver={(event) => event.preventDefault()}
-          onDragLeave={(event) => {
-            event.preventDefault();
-            if (dropZoneRef.current && !dropZoneRef.current.contains(event.relatedTarget as Node)) setDragging(false);
-          }}
-          onDrop={onDrop}
-        >
-          <input
-            ref={inputRef}
-            id="metadata-file-input"
-            type="file"
-            accept={mode === "image" ? IMAGE_ACCEPT : VIDEO_ACCEPT}
-            onChange={onFileChange}
-            className={styles.hiddenInput}
-            disabled={isBusy}
-          />
-          <div className={styles.dropZoneIcon}>
-            {file ? (
-              mode === "image" ? (
-                <ImageIcon className="h-6 w-6" />
-              ) : (
-                <FilmStripIcon className="h-6 w-6" />
-              )
-            ) : (
-              <UploadIcon className="h-6 w-6" />
-            )}
-          </div>
-          <p className={styles.dropZoneLabel}>{file ? "Choose a different file" : `Drop one ${mode} here or browse`}</p>
-          <p className={styles.dropZoneHint}>Files are kept only in memory and disappear when this page is reloaded.</p>
-          <p className={styles.dropZoneAccept}>{supportedFormats}</p>
-        </div>
-
-        {file && (
-          <div className={styles.filePreview}>
-            <div className={styles.fileIconWrapper}>
-              {mode === "image" ? <ImageIcon className="h-5 w-5" /> : <FilmStripIcon className="h-5 w-5" />}
-            </div>
-            <div className={styles.fileInfo}>
-              <p className={styles.fileName}>{file.name}</p>
-              <p className={styles.fileSize}>
-                {formatBytes(file.size)} · output: {getOutputFileName(file.name, "clean")}
-              </p>
-            </div>
-            <button
-              type="button"
-              className={styles.fileRemove}
-              onClick={removeFile}
-              aria-label="Remove file"
-              disabled={isBusy}
-            >
-              <TrashIcon className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-
-        {mode === "video" && processingLocation === "server" && file && metadataEntries.length === 0 && !isBusy && (
-          <div className={cn(styles.serverCallout, serverTooLarge && styles.serverCalloutError)}>
-            <div>
-              <p className={styles.calloutTitle}>
-                {serverTooLarge ? "Server unavailable for this file" : "Ready for server inspection"}
-              </p>
-              <p className={styles.calloutText}>
-                {serverTooLarge
-                  ? "This video is larger than 250 MB. SnapBox will not upload it."
-                  : "Nothing has been uploaded. Continue only if you consent to sending this video for temporary processing."}
-              </p>
-            </div>
-            {!serverTooLarge && <Button onClick={inspectOnServer}>Inspect on server</Button>}
-          </div>
-        )}
-
-        {isBusy && (
-          <div className={styles.processingPanel}>
-            <div className={styles.spinner} />
-            <div>
-              <p className={styles.processingText}>
-                {processingState === "inspecting"
-                  ? "Inspecting metadata…"
-                  : processingState === "uploading"
-                    ? "Uploading with consent…"
-                    : "Cleaning and verifying…"}
-              </p>
-              <p className={styles.processingHint}>
-                {processingLocation === "local" || mode === "image"
-                  ? "This work stays on your device."
-                  : "Temporary server files are deleted after the response."}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {file && metadataError && !isBusy && (
-          <div className={cn(styles.feedback, styles.feedbackError)}>
-            <XMarkCircleIcon className={cn("h-4 w-4", styles.feedbackIcon)} />
-            <span>{metadataError}</span>
-            {mode === "video" && processingLocation === "local" && file.size <= MAX_SERVER_VIDEO_BYTES && (
-              <button type="button" className={styles.inlineAction} onClick={() => changeProcessingLocation("server")}>
-                Use server fallback
-              </button>
-            )}
-          </div>
-        )}
-
-        {file && metadataEntries.length > 0 && removableEntries.length > 0 && !isBusy && (
-          <section className={styles.cleaningPanel}>
-            <div className={styles.metadataHeader}>
-              <div>
-                <p className={styles.metadataTitle}>Choose a cleaning level</p>
-                <p className={styles.metadataHint}>
-                  {removableEntries.length} removable · {protectedCount} protected
-                </p>
+        <h1 className={styles.visuallyHidden}>Metadata remover</h1>
+        <div className={cn(styles.workspace, showWorkbench ? styles.workspaceWorkbench : styles.workspaceSetup)}>
+          <aside className={styles.workflowPanel} aria-labelledby="file-panel-title">
+            <div className={styles.workflowControls}>
+              <div className={styles.panelHeading}>
+                <h2 id="file-panel-title">File</h2>
+                <div className={styles.modeToggle} role="group" aria-label="File type">
+                  <button
+                    type="button"
+                    onClick={() => changeMode("image")}
+                    className={cn(styles.modeButton, mode === "image" && styles.modeButtonActive)}
+                    aria-pressed={mode === "image"}
+                    disabled={isBusy}
+                  >
+                    <ImageIcon className="h-4 w-4" /> Image
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => changeMode("video")}
+                    className={cn(styles.modeButton, mode === "video" && styles.modeButtonActive)}
+                    aria-pressed={mode === "video"}
+                    disabled={isBusy}
+                  >
+                    <FilmStripIcon className="h-4 w-4" /> Video
+                  </button>
+                </div>
               </div>
-              {preset === "custom" && <span className={styles.customBadge}>Custom</span>}
+
+              {mode === "video" && (
+                <div className={styles.controlBlock}>
+                  <span className={styles.controlLabel}>Processing</span>
+                  <div className={styles.processingChooser} role="group" aria-label="Video processing location">
+                    <button
+                      type="button"
+                      className={cn(
+                        styles.processingOption,
+                        processingLocation === "local" && styles.processingOptionActive,
+                      )}
+                      onClick={() => changeProcessingLocation("local")}
+                      aria-pressed={processingLocation === "local"}
+                      disabled={isBusy}
+                    >
+                      On device
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(
+                        styles.processingOption,
+                        processingLocation === "server" && styles.processingOptionActive,
+                        processingLocation === "local" &&
+                          metadataError &&
+                          file &&
+                          file.size <= MAX_SERVER_VIDEO_BYTES &&
+                          (isSupportedVideoType(file.type) || isSupportedVideoExtension(file.name)) &&
+                          styles.processingOptionSuggested,
+                      )}
+                      onClick={() => changeProcessingLocation("server")}
+                      aria-pressed={processingLocation === "server"}
+                      disabled={isBusy}
+                    >
+                      On server
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div
+                ref={dropZoneRef}
+                className={cn(styles.dropZone, dragging && styles.dropZoneDragging, file && styles.dropZoneHasFile)}
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  if (!isBusy) setDragging(true);
+                }}
+                onDragOver={(event) => event.preventDefault()}
+                onDragLeave={(event) => {
+                  event.preventDefault();
+                  if (dropZoneRef.current && !dropZoneRef.current.contains(event.relatedTarget as Node)) {
+                    setDragging(false);
+                  }
+                }}
+                onDrop={onDrop}
+              >
+                <input
+                  ref={inputRef}
+                  id="metadata-file-input"
+                  type="file"
+                  accept={mode === "image" ? IMAGE_ACCEPT : VIDEO_ACCEPT}
+                  onChange={onFileChange}
+                  onClick={(event) => {
+                    event.currentTarget.value = "";
+                  }}
+                  className={styles.hiddenInput}
+                  disabled={isBusy}
+                  aria-label={`Choose ${mode} file`}
+                />
+
+                {file ? (
+                  <>
+                    <div className={styles.fileIconWrapper}>
+                      {mode === "image" ? <ImageIcon className="h-5 w-5" /> : <FilmStripIcon className="h-5 w-5" />}
+                    </div>
+                    <div className={styles.fileInfo}>
+                      <p className={styles.fileName}>{file.name}</p>
+                      <p className={styles.fileSize}>
+                        {formatBytes(file.size)} · {getOutputFileName(file.name, "clean")}
+                      </p>
+                    </div>
+                    <span className={styles.replaceFile}>Replace</span>
+                    <button
+                      type="button"
+                      className={styles.fileRemove}
+                      onClick={removeFile}
+                      aria-label="Remove file"
+                      disabled={isBusy}
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className={styles.dropZoneIcon}>
+                      <UploadIcon className="h-5 w-5" />
+                    </div>
+                    <p className={styles.dropZoneLabel}>Drop {mode} or browse</p>
+                  </>
+                )}
+              </div>
+
+              {waitingForServerInspection && (
+                <div
+                  className={cn(styles.serverCallout, serverTooLarge && styles.serverCalloutError)}
+                  role={serverTooLarge ? "alert" : "status"}
+                >
+                  <span>{serverTooLarge ? "File exceeds the 250 MB limit" : "Server inspection required"}</span>
+                  {!serverTooLarge && <Button onClick={inspectOnServer}>Inspect</Button>}
+                </div>
+              )}
+
+              {isBusy && (!showWorkbench || metadataEntries.length > 0) && (
+                <div className={styles.processingPanel} role="status" aria-live="polite">
+                  <div className={styles.processingLine}>
+                    <div className={styles.spinner} />
+                    <p className={styles.processingText}>
+                      {processingState === "inspecting"
+                        ? "Inspecting metadata…"
+                        : processingState === "uploading"
+                          ? "Uploading…"
+                          : "Cleaning and verifying…"}
+                    </p>
+                  </div>
+                  {progress > 0 && processingState !== "inspecting" && (
+                    <div className={styles.uploadProgress}>
+                      <div
+                        className={styles.progressBar}
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={progress}
+                      >
+                        <div className={styles.progressFill} style={{ width: `${progress}%` }} />
+                      </div>
+                      <span>{progress}%</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {file && metadataError && !isBusy && (
+                <div className={cn(styles.feedback, styles.feedbackError)} role="alert">
+                  <XMarkCircleIcon className={cn("h-4 w-4", styles.feedbackIcon)} />
+                  <span>{metadataError}</span>
+                  {mode === "video" &&
+                    processingLocation === "local" &&
+                    file.size <= MAX_SERVER_VIDEO_BYTES &&
+                    (isSupportedVideoType(file.type) || isSupportedVideoExtension(file.name)) && (
+                      <button
+                        type="button"
+                        className={styles.inlineAction}
+                        onClick={() => changeProcessingLocation("server")}
+                      >
+                        Use server
+                      </button>
+                    )}
+                  {mode === "video" && processingLocation === "server" && !serverTooLarge && (
+                    <button type="button" className={styles.inlineAction} onClick={inspectOnServer}>
+                      Retry
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {file && metadataEntries.length > 0 && removableEntries.length > 0 && !isBusy && (
+                <section className={styles.cleaningControls} aria-labelledby="cleaning-level-title">
+                  <div className={styles.sectionHeading}>
+                    <h3 id="cleaning-level-title">Cleaning level</h3>
+                    {preset === "custom" && <span className={styles.customBadge}>Custom</span>}
+                  </div>
+                  <div className={styles.presetButtons} role="group" aria-label="Cleaning level">
+                    <button
+                      type="button"
+                      className={cn(styles.presetButton, preset === "safe" && styles.presetButtonActive)}
+                      onClick={() => applyPreset("safe")}
+                      aria-pressed={preset === "safe"}
+                    >
+                      Safe
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(styles.presetButton, preset === "maximum" && styles.presetButtonActive)}
+                      onClick={() => applyPreset("maximum")}
+                      aria-pressed={preset === "maximum"}
+                    >
+                      Maximum
+                    </button>
+                  </div>
+                </section>
+              )}
+
+              {(hasNothingToClean || hasNoDetectedMetadata) && (
+                <div className={cn(styles.feedback, styles.feedbackSuccess)} role="status">
+                  <CheckCircleIcon className={cn("h-4 w-4", styles.feedbackIcon)} />
+                  This file already appears clean
+                </div>
+              )}
+
+              {message && !report && !hasNothingToClean && !hasNoDetectedMetadata && (
+                <div className={cn(styles.feedback, styles.feedbackSuccess)} role="status">
+                  <CheckCircleIcon className={cn("h-4 w-4", styles.feedbackIcon)} /> {message}
+                </div>
+              )}
+              {error && (
+                <div className={cn(styles.feedback, styles.feedbackError)} role="alert">
+                  <XMarkCircleIcon className={cn("h-4 w-4", styles.feedbackIcon)} /> {error}
+                </div>
+              )}
             </div>
 
-            <div className={styles.presetButtons}>
-              <button
-                type="button"
-                className={cn(styles.presetButton, preset === "safe" && styles.presetButtonActive)}
-                onClick={() => applyPreset("safe")}
-              >
-                <span>Safe cleaning</span>
-                <small>Personal, location, date, device and history data</small>
-              </button>
-              <button
-                type="button"
-                className={cn(styles.presetButton, preset === "maximum" && styles.presetButtonActive)}
-                onClick={() => applyPreset("maximum")}
-              >
-                <span>Maximum cleaning</span>
-                <small>Also removes remaining non-functional metadata</small>
-              </button>
-            </div>
+            {showWorkbench && metadataGroups.length > 0 && (
+              <nav className={styles.groupRail} aria-label="Metadata groups">
+                <span className={styles.groupRailTitle}>Groups</span>
+                <div className={styles.groupList}>
+                  {metadataGroups.map(([group, entries]) => (
+                    <button
+                      key={group}
+                      type="button"
+                      className={cn(
+                        styles.groupButton,
+                        !metadataQuery.trim() && activeGroup === group && styles.groupButtonActive,
+                      )}
+                      onClick={() => {
+                        setActiveGroup(group);
+                        setMetadataQuery("");
+                      }}
+                      aria-pressed={!metadataQuery.trim() && activeGroup === group}
+                      disabled={isBusy}
+                    >
+                      <span>{group}</span>
+                      <span>{entries.length}</span>
+                    </button>
+                  ))}
+                </div>
+              </nav>
+            )}
+          </aside>
 
-            <button
-              type="button"
-              className={styles.detailsToggle}
-              onClick={() => setDetailsOpen((open) => !open)}
-              aria-expanded={detailsOpen}
-            >
-              <span>Details and manual selection</span>
-              <ChevronDownIcon className={cn("h-4 w-4", detailsOpen && styles.chevronOpen)} />
-            </button>
+          {showWorkbench && (
+            <div className={styles.resultsColumn}>
+              {report && (
+                <section
+                  className={cn(styles.report, report.unresolved.length > 0 && styles.reportWarning)}
+                  aria-labelledby="verification-title"
+                >
+                  <div className={styles.reportHeader}>
+                    {report.unresolved.length > 0 ? (
+                      <WarningIcon className="h-5 w-5" />
+                    ) : (
+                      <CheckCircleIcon className="h-5 w-5" />
+                    )}
+                    <div>
+                      <p id="verification-title" className={styles.reportTitle}>
+                        {report.unresolved.length > 0 ? "Unresolved fields" : "Cleaning verified"}
+                      </p>
+                      <p className={styles.reportText}>
+                        {report.unresolved.length > 0 ? "Download paused" : "Download started"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className={styles.reportStats}>
+                    <span>
+                      <strong>{report.removed.length}</strong> removed
+                    </span>
+                    <span>
+                      <strong>{report.preserved.length}</strong> preserved
+                    </span>
+                    <span>
+                      <strong>{report.unresolved.length}</strong> unresolved
+                    </span>
+                  </div>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button type="button" variant="secondary" className={styles.reportDetailsTrigger}>
+                        View details <ChevronRightIcon className="h-3.5 w-3.5" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent size="large" className={styles.reportDialog}>
+                      <DialogHeader>
+                        <DialogTitle>Cleaning report</DialogTitle>
+                        <DialogDescription className={styles.visuallyHidden}>
+                          Metadata fields removed, preserved, or left unresolved after cleaning.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className={styles.reportSections}>
+                        {[
+                          {
+                            label: "Removed",
+                            entries: report.removed,
+                            tone: styles.reportSectionRemoved,
+                          },
+                          {
+                            label: "Preserved",
+                            entries: report.preserved,
+                            tone: styles.reportSectionPreserved,
+                          },
+                          {
+                            label: "Unresolved",
+                            entries: report.unresolved,
+                            tone: styles.reportSectionUnresolved,
+                          },
+                        ]
+                          .filter(({ entries }) => entries.length > 0)
+                          .map(({ label, entries, tone }) => (
+                            <section key={label} className={cn(styles.reportSection, tone)}>
+                              <header className={styles.reportSectionHeader}>
+                                <h3>{label}</h3>
+                                <span>{entries.length}</span>
+                              </header>
+                              <ul className={styles.reportEntryList}>
+                                {entries.map((entry) => (
+                                  <li key={entry.id} className={styles.reportEntry}>
+                                    <span className={styles.reportEntryName}>{entry.label}</span>
+                                    {duplicateMetadataLabels.has(normalizeMetadataLabel(entry.label)) && (
+                                      <span className={styles.reportEntryOrigin}>{entry.sourceLabel}</span>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            </section>
+                          ))}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                  {report.unresolved.length > 0 && (
+                    <Button
+                      variant="secondary"
+                      className={styles.reportWarningAction}
+                      onClick={() => pendingDownload && downloadBlob(pendingDownload.blob, pendingDownload.fileName)}
+                      disabled={!pendingDownload}
+                    >
+                      <DownloadIcon className="h-4 w-4" /> Download with warning
+                    </Button>
+                  )}
+                </section>
+              )}
 
-            {detailsOpen && (
-              <div className={styles.detailsBody}>
-                <div className={styles.metadataSearch}>
-                  <input
-                    value={metadataQuery}
-                    onChange={(event) => setMetadataQuery(event.target.value)}
-                    placeholder="Search fields or values"
-                    className={styles.metadataSearchInput}
-                  />
-                  <span className={styles.metadataSearchCount}>{filteredEntries.length} shown</span>
+              <section className={styles.metadataPanel} aria-labelledby="metadata-panel-title">
+                <div className={styles.metadataHeader}>
+                  <div>
+                    <h2 id="metadata-panel-title">Metadata</h2>
+                    {metadataEntries.length > 0 && (
+                      <p>
+                        {removableEntries.length} removable · {protectedCount} protected
+                      </p>
+                    )}
+                  </div>
+                  {metadataEntries.length > 0 && (
+                    <Input
+                      value={metadataQuery}
+                      onChange={(event) => setMetadataQuery(event.target.value)}
+                      placeholder="Search metadata"
+                      aria-label="Search metadata fields or values"
+                      variant="soft"
+                      className={styles.metadataSearch}
+                      disabled={isBusy}
+                    >
+                      <InputSlot side="left">
+                        <MagnifyingGlassIcon className="h-4 w-4" />
+                      </InputSlot>
+                    </Input>
+                  )}
                 </div>
 
-                {groupedEntries.map(([group, entries]) => {
-                  const selectable = entries.filter((entry) => !entry.protected);
-                  return (
-                    <div key={group} className={styles.metadataGroup}>
-                      <div className={styles.metadataGroupHeader}>
-                        <span className={styles.metadataGroupTitle}>{group}</span>
-                        {selectable.length > 0 && (
-                          <span className={styles.metadataGroupActions}>
-                            <button
-                              type="button"
-                              onClick={() => selectGroup(selectable, true)}
-                              className={styles.metadataGroupButton}
-                            >
-                              Select
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => selectGroup(selectable, false)}
-                              className={styles.metadataGroupButton}
-                            >
-                              Clear
-                            </button>
-                          </span>
-                        )}
-                      </div>
-                      <div className={styles.metadataList}>
-                        {entries.map((entry) => (
-                          <label
-                            key={entry.id}
-                            className={cn(styles.metadataRow, entry.protected && styles.metadataRowProtected)}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={!entry.protected && selectedMetadata.has(entry.id)}
-                              disabled={entry.protected}
-                              onChange={() => toggleMetadataSelection(entry)}
-                              className={styles.metadataCheckbox}
-                            />
-                            <span className={styles.metadataField}>
-                              <span className={styles.metadataKey}>{entry.label}</span>
-                              {entry.protected && (
-                                <span className={styles.protectedLabel}>
-                                  <LockIcon className="h-3 w-3" /> Protected
-                                </span>
-                              )}
-                            </span>
-                            <span className={styles.metadataValue}>{entry.value}</span>
-                          </label>
-                        ))}
-                      </div>
+                {metadataEntries.length > 0 ? (
+                  <div key={inspectionRevision} className={styles.metadataBrowser}>
+                    <div className={styles.metadataContent}>
+                      <ScrollArea className={styles.metadataScroll}>
+                        <div className={styles.metadataScrollInner}>
+                          {visibleGroups.length > 0 ? (
+                            visibleGroups.map(([group, entries]) => {
+                              const selectable = entries.filter((entry) => !entry.protected);
+                              return (
+                                <section key={group} className={styles.metadataGroup}>
+                                  <div className={styles.metadataGroupHeader}>
+                                    <div className={styles.metadataGroupTitle}>
+                                      <h3>{group}</h3>
+                                      <span>
+                                        {entries.length} {entries.length === 1 ? "field" : "fields"}
+                                      </span>
+                                    </div>
+                                    {selectable.length > 0 && (
+                                      <div className={styles.metadataGroupActions}>
+                                        <button
+                                          type="button"
+                                          onClick={() => selectGroup(selectable, true)}
+                                          className={styles.metadataGroupButton}
+                                          disabled={isBusy}
+                                        >
+                                          Select all
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => selectGroup(selectable, false)}
+                                          className={styles.metadataGroupButton}
+                                          disabled={isBusy}
+                                        >
+                                          Clear
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className={styles.metadataList}>
+                                    {entries.map((entry) => {
+                                      const MetadataRow = entry.protected ? "div" : "label";
+                                      return (
+                                        <MetadataRow
+                                          key={entry.id}
+                                          className={cn(
+                                            styles.metadataRow,
+                                            entry.protected && styles.metadataRowProtected,
+                                            selectedMetadata.has(entry.id) && styles.metadataRowSelected,
+                                          )}
+                                        >
+                                          {entry.protected ? (
+                                            <span
+                                              className={styles.metadataProtectedControl}
+                                              title={entry.protectionReason}
+                                              role="img"
+                                              aria-label={
+                                                entry.protectionReason
+                                                  ? `Protected metadata: ${entry.protectionReason}`
+                                                  : "Protected metadata"
+                                              }
+                                            >
+                                              <LockIcon aria-hidden="true" />
+                                            </span>
+                                          ) : (
+                                            <input
+                                              type="checkbox"
+                                              checked={selectedMetadata.has(entry.id)}
+                                              disabled={isBusy}
+                                              onChange={() => toggleMetadataSelection(entry)}
+                                              className={styles.metadataCheckbox}
+                                            />
+                                          )}
+                                          <span className={styles.metadataField}>
+                                            <span className={styles.metadataKey}>{entry.label}</span>
+                                            {duplicateMetadataLabels.has(normalizeMetadataLabel(entry.label)) && (
+                                              <span className={styles.metadataOrigin}>{entry.sourceLabel}</span>
+                                            )}
+                                          </span>
+                                          <span className={styles.metadataValue} title={entry.value}>
+                                            {entry.value}
+                                          </span>
+                                        </MetadataRow>
+                                      );
+                                    })}
+                                  </div>
+                                </section>
+                              );
+                            })
+                          ) : (
+                            <div className={styles.noResults}>No matching metadata</div>
+                          )}
+                        </div>
+                      </ScrollArea>
                     </div>
-                  );
-                })}
-                <p className={styles.protectedNote}>
-                  Orientation, color, animation, playback and stream structure stay protected so the file remains
-                  usable.
-                </p>
-              </div>
-            )}
+                  </div>
+                ) : (
+                  <div className={styles.emptyMetadata} role="status" aria-live="polite">
+                    <div className={styles.emptyMetadataIcon}>
+                      {isBusy ? (
+                        <div className={styles.spinner} />
+                      ) : mode === "image" ? (
+                        <ImageIcon className="h-5 w-5" />
+                      ) : (
+                        <FilmStripIcon className="h-5 w-5" />
+                      )}
+                    </div>
+                    <p>
+                      {!file
+                        ? "Select a file to begin"
+                        : isBusy
+                          ? processingState === "uploading"
+                            ? "Uploading file…"
+                            : "Inspecting metadata…"
+                          : waitingForServerInspection
+                            ? serverTooLarge
+                              ? "Server limit exceeded"
+                              : "Inspect the file to continue"
+                            : metadataError
+                              ? "Metadata unavailable"
+                              : inspectionComplete
+                                ? "No metadata found"
+                                : "Ready to inspect"}
+                    </p>
+                  </div>
+                )}
 
-            <div className={styles.selectionSummary}>
-              <strong>{selectedCount}</strong> fields selected for removal
+                {metadataEntries.length > 0 && (
+                  <footer className={styles.metadataFooter} aria-live="polite" aria-atomic="true">
+                    <span className={cn(styles.selectionStatus, selectedCount > 0 && styles.selectionStatusActive)}>
+                      <CheckCircleIcon className={styles.selectionStatusIcon} aria-hidden="true" />
+                      <span className={styles.selectionStatusCopy}>
+                        <strong>{selectedCount}</strong>
+                        <span>{selectedCount === 1 ? "field selected" : "fields selected"}</span>
+                      </span>
+                    </span>
+                  </footer>
+                )}
+              </section>
             </div>
-          </section>
-        )}
-
-        {(hasNothingToClean || hasNoDetectedMetadata) && (
-          <div className={cn(styles.feedback, styles.feedbackSuccess)}>
-            <CheckCircleIcon className={cn("h-4 w-4", styles.feedbackIcon)} />
-            This file already appears clean
-          </div>
-        )}
-
-        {progress > 0 && isBusy && processingState !== "inspecting" && (
-          <div className={styles.uploadProgress}>
-            <div className={styles.progressBar}>
-              <div className={styles.progressFill} style={{ width: `${progress}%` }} />
-            </div>
-            <p className={styles.progressText}>
-              {processingState === "uploading" ? `Uploading — ${progress}%` : `Processing — ${progress}%`}
-            </p>
-          </div>
-        )}
-
-        {report && (
-          <section className={cn(styles.report, report.unresolved.length > 0 && styles.reportWarning)}>
-            <div className={styles.reportHeader}>
-              {report.unresolved.length > 0 ? (
-                <WarningIcon className="h-5 w-5" />
-              ) : (
-                <CheckCircleIcon className="h-5 w-5" />
-              )}
-              <div>
-                <p className={styles.reportTitle}>
-                  {report.unresolved.length > 0 ? "Verification found unresolved fields" : "Cleaning verified"}
-                </p>
-                <p className={styles.reportText}>
-                  {report.unresolved.length > 0
-                    ? "The download did not start. You can review the result and decide whether to download it with a warning."
-                    : "No selected fields remain among the metadata SnapBox can detect."}
-                </p>
-              </div>
-            </div>
-            <div className={styles.reportGrid}>
-              <div>
-                <strong>{report.removed.length}</strong>
-                <span>Removed</span>
-              </div>
-              <div>
-                <strong>{report.preserved.length}</strong>
-                <span>Preserved</span>
-              </div>
-              <div>
-                <strong>{report.unresolved.length}</strong>
-                <span>Unresolved</span>
-              </div>
-            </div>
-            <div className={styles.reportDetails}>
-              {[
-                { label: "Removed", entries: report.removed },
-                { label: "Preserved", entries: report.preserved },
-                { label: "Unresolved", entries: report.unresolved },
-              ].map(({ label, entries }) => (
-                <details key={label}>
-                  <summary>
-                    {label} ({entries.length})
-                  </summary>
-                  {entries.length > 0 ? (
-                    <ul>
-                      {entries.map((entry) => (
-                        <li key={entry.id}>{entry.label}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p>None</p>
-                  )}
-                </details>
-              ))}
-            </div>
-            {report.unresolved.length > 0 && (
-              <>
-                <Button
-                  variant="secondary"
-                  onClick={() => pendingDownload && downloadBlob(pendingDownload.blob, pendingDownload.fileName)}
-                  disabled={!pendingDownload}
-                >
-                  <DownloadIcon className="h-4 w-4" /> Download with warning
-                </Button>
-              </>
-            )}
-          </section>
-        )}
-
-        {message && (
-          <div className={cn(styles.feedback, styles.feedbackSuccess)}>
-            <CheckCircleIcon className={cn("h-4 w-4", styles.feedbackIcon)} /> {message}
-          </div>
-        )}
-        {error && (
-          <div className={cn(styles.feedback, styles.feedbackError)}>
-            <XMarkCircleIcon className={cn("h-4 w-4", styles.feedbackIcon)} /> {error}
-          </div>
-        )}
-
-        <div className={styles.privacyNotice}>
-          <Shield01Icon className="h-3.5 w-3.5" />
-          {mode === "image" || processingLocation === "local"
-            ? "Local processing: this file is never uploaded or stored persistently."
-            : "Server fallback uploads only after consent and removes temporary files after the response."}
+          )}
         </div>
       </main>
     </>
