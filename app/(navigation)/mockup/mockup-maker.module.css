@@ -30,20 +30,6 @@
   font-size: 13px;
 }
 
-.localBadge {
-  display: inline-flex;
-  height: 26px;
-  align-items: center;
-  padding: 0 9px;
-  border: 1px solid hsla(147, 55%, 55%, 0.24);
-  border-radius: 999px;
-  background: hsla(147, 55%, 55%, 0.08);
-  color: hsl(147 55% 70%);
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
 .workspace {
   display: grid;
   overflow: hidden;
@@ -376,14 +362,6 @@
   cursor: pointer;
 }
 
-.privacyNote {
-  padding: 14px 16px 18px;
-  margin: auto 0 0;
-  color: hsl(var(--gray-9));
-  font-size: 10px;
-  line-height: 1.45;
-}
-
 .previewColumn {
   display: flex;
   min-width: 0;
@@ -471,22 +449,6 @@
   text-align: center;
 }
 
-.previewFooter {
-  display: flex;
-  min-height: 28px;
-  align-items: center;
-  justify-content: space-between;
-  color: hsl(var(--gray-9));
-  font-size: 10px;
-  gap: 12px;
-}
-
-.previewFooter span:first-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 @media (max-width: 900px) {
   .container {
     padding: 18px 16px 24px;
@@ -504,10 +466,6 @@
     border-bottom: 1px solid var(--gray-a3);
   }
 
-  .privacyNote {
-    margin-top: 0;
-  }
-
   .previewColumn {
     min-height: 540px;
   }
@@ -519,10 +477,6 @@
     align-items: flex-start;
   }
 
-  .localBadge {
-    display: none;
-  }
-
   .previewColumn {
     min-height: 460px;
     padding: 10px;
@@ -530,9 +484,5 @@
 
   .canvas {
     min-height: 430px;
-  }
-
-  .previewFooter {
-    padding-inline: 3px;
   }
 }

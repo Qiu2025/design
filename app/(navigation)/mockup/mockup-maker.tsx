@@ -282,7 +282,6 @@ export function MockupMaker() {
             <h1>Mockup Maker</h1>
             <p>Place a screenshot inside a phone, tablet or laptop frame.</p>
           </div>
-          <span className={styles.localBadge}>Runs locally</span>
         </header>
 
         <div className={styles.workspace}>
@@ -519,8 +518,6 @@ export function MockupMaker() {
                 />
               </label>
             </section>
-
-            <p className={styles.privacyNote}>Your screenshot stays in this browser and is never uploaded.</p>
           </aside>
 
           <section className={styles.previewColumn} aria-label="Mockup preview">
@@ -539,10 +536,6 @@ export function MockupMaker() {
                 </div>
               </div>
               {!imageUrl && <p className={styles.canvasHint}>Upload a screenshot to start creating your mockup.</p>}
-            </div>
-            <div className={styles.previewFooter}>
-              <span>{imageUrl ? imageName : "No screenshot selected"}</span>
-              <span>PNG · 2× export</span>
             </div>
           </section>
         </div>
