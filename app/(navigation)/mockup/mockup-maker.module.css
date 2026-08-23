@@ -470,7 +470,7 @@
   border: 1px solid var(--gray-a4);
   border-radius: 5px;
   margin-bottom: 8px;
-  background-clip: padding-box;
+  background-clip: border-box;
 }
 
 .gradientStops {
@@ -669,10 +669,10 @@
   flex: 1;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--gray-a3);
+  border: 1px solid hsl(var(--gray-4));
   border-radius: 10px;
   background: #17181c;
-  background-clip: padding-box;
+  background-clip: border-box;
   isolation: isolate;
 }
 
@@ -720,6 +720,10 @@
 
 .deviceFrame {
   filter: drop-shadow(0 24px 30px rgb(0 0 0 / 0.3));
+}
+
+.deviceFrame:global(.mockframe) :global(.screen) {
+  background-color: transparent;
 }
 
 .screenImage {

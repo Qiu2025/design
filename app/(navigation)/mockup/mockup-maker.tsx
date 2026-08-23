@@ -1037,7 +1037,6 @@ export function MockupMaker() {
                   : {
                       backgroundColor: isGradientBackground(background) ? undefined : background,
                       backgroundImage: isGradientBackground(background) ? background : undefined,
-                      backgroundClip: "padding-box",
                     }
               }
             >
