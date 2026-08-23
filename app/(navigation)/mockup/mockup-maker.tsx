@@ -1028,6 +1028,7 @@ export function MockupMaker() {
           </aside>
 
           <section className={styles.previewColumn} aria-label="Mockup preview">
+            <div className={styles.canvasLabel}>Preview</div>
             <div
               ref={canvasRef}
               className={cn(styles.canvas, transparentBackground && styles.canvasTransparent)}
@@ -1040,7 +1041,6 @@ export function MockupMaker() {
                     }
               }
             >
-              <div className={styles.canvasLabel}>Preview</div>
               <div className={styles.frameCenter}>
                 <div
                   className={styles.frameRenderer}
