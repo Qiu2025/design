@@ -187,7 +187,6 @@ export function MockupMaker() {
     const nextDevice = event.target.value as DeviceName;
     setSelectedDevice(nextDevice);
     setSelectedColor(getInitialColor(nextDevice));
-    setLandscape(false);
     setFrameScale(getInitialFrameScale(nextDevice));
   };
 
