@@ -1,4 +1,10 @@
-import { getOutputFileName, isSupportedVideoExtension, isSupportedVideoType } from "@/utils/media";
+import {
+  getOutputFileName,
+  isSupportedVideoExtension,
+  isSupportedVideoType,
+  resolveVideoContainer,
+  type ValidatedVideoContainer,
+} from "@/utils/media";
 import {
   buildVerificationReport,
   classifyMetadata,
@@ -23,13 +29,15 @@ type FFmpegInstance = import("@ffmpeg/ffmpeg").FFmpeg;
 type LocalVideoOperation = "inspect" | "clean";
 type LocalVideoStage = "engine_load" | "mount" | "probe" | "remux" | "verify";
 type ProbeData = {
-  format?: { tags?: Record<string, unknown> };
+  format?: { format_name?: string; tags?: Record<string, unknown> };
   streams?: Array<{ index: number; codec_type?: string; tags?: Record<string, unknown> }>;
   chapters?: Array<{ id?: number; tags?: Record<string, unknown> }>;
+  programs?: Array<{ program_id?: number }>;
 };
 
 let ffmpegPromise: Promise<FFmpegInstance> | null = null;
 let localVideoOperationQueue = Promise.resolve();
+const inspectedVideoContainers = new WeakMap<File, ValidatedVideoContainer>();
 
 class LocalVideoDiagnosticError extends Error {
   readonly diagnostic: string[];
@@ -69,8 +77,6 @@ const getVideoFormat = (file: File) => {
     }[file.type] || ""
   );
 };
-
-const getVideoMimeType = (file: File) => file.type || "application/octet-stream";
 
 const getSizeRange = (bytes: number) => {
   const megabytes = bytes / (1024 * 1024);
@@ -257,7 +263,7 @@ const probeDataToEntries = (data: ProbeData, container: string) => {
   (data.chapters || []).forEach((chapter, position) => {
     Object.entries(chapter.tags || {}).forEach(([key, value]) => {
       const entry = createVideoEntry("chapter", key, value, {
-        chapterIndex: chapter.id ?? position,
+        chapterIndex: position,
         sourceGroup: `Chapter ${position + 1}`,
         sourceLabel: `Chapter ${position + 1}`,
       });
@@ -316,7 +322,7 @@ const probePath = async (ffmpeg: FFmpegInstance, inputPath: string, stage: "prob
         "-print_format",
         "json",
         "-show_entries",
-        "format_tags:stream=index,codec_type:stream_tags:chapter=id:chapter_tags",
+        "format=format_name:format_tags:stream=index,codec_type:stream_tags:chapter=id:chapter_tags:program=program_id",
         inputPath,
         "-o",
         outputPath,
@@ -396,20 +402,33 @@ const parseFfmpegInputLog = (lines: string[]): ProbeData | null => {
   const formatTags: Record<string, unknown> = {};
   const streams: NonNullable<ProbeData["streams"]> = [];
   const chapters: NonNullable<ProbeData["chapters"]> = [];
+  const programs: NonNullable<ProbeData["programs"]> = [];
   let activeTags = formatTags;
   let currentTag: string | null = null;
+  let formatName = "";
   let readingInput = false;
   let readingMetadata = false;
 
   lines.forEach((line) => {
-    if (/^Input #0(?:,|\s)/.test(line)) {
+    const inputMatch = line.match(/^Input #0,\s*(.+),\s+from\s+/);
+    if (inputMatch) {
       readingInput = true;
+      formatName = inputMatch[1].trim();
       activeTags = formatTags;
       currentTag = null;
       readingMetadata = false;
       return;
     }
     if (!readingInput) return;
+
+    const programMatch = line.match(/^\s{2,}Program\s+(\d+)(?:\s|$)/);
+    if (programMatch) {
+      programs.push({ program_id: Number(programMatch[1]) });
+      activeTags = {};
+      currentTag = null;
+      readingMetadata = false;
+      return;
+    }
 
     const streamMatch = line.match(
       /^\s{2,}Stream #0:(\d+)(?:\[[^\]]+\])?(?:\(([^)]+)\))?:\s*(Video|Audio|Subtitle|Data|Attachment|Unknown)\s*:/i,
@@ -461,7 +480,7 @@ const parseFfmpegInputLog = (lines: string[]): ProbeData | null => {
   });
 
   if (!readingInput || streams.length === 0) return null;
-  return { format: { tags: formatTags }, streams, chapters };
+  return { format: { format_name: formatName, tags: formatTags }, streams, chapters, programs };
 };
 
 const probePathWithFfmpegLog = async (ffmpeg: FFmpegInstance, inputPath: string, stage: "probe" | "verify") => {
@@ -585,6 +604,25 @@ const probeVideo = async (file: File, stage: "probe" | "verify") => {
   }
 };
 
+const validateVideoProbe = (file: File, data: ProbeData, stage: "probe" | "verify") => {
+  if ((data.programs || []).length > 0) {
+    throw new LocalVideoDiagnosticError(
+      "This video uses a program structure that SnapBox cannot preserve safely.",
+      stage,
+    );
+  }
+
+  try {
+    return resolveVideoContainer(file.name, file.type, data.format?.format_name);
+  } catch (error) {
+    throw new LocalVideoDiagnosticError(
+      error instanceof Error ? error.message : "The detected video container is not supported.",
+      stage,
+      { diagnostic: getSafeErrorDiagnostic(error) },
+    );
+  }
+};
+
 export const getLocalVideoSupport = (file: File) => {
   if (typeof WebAssembly === "undefined" || typeof Worker === "undefined") {
     return { supported: false, reason: "This browser cannot run the local video engine." };
@@ -615,7 +653,10 @@ export const inspectLocalVideo = async (file: File) => {
   return runLocalVideoOperation(async () => {
     const startedAt = performance.now();
     try {
-      return probeDataToEntries(await probeVideo(file, "probe"), getVideoFormat(file));
+      const data = await probeVideo(file, "probe");
+      const container = validateVideoProbe(file, data, "probe");
+      inspectedVideoContainers.set(file, container);
+      return probeDataToEntries(data, container.extension);
     } catch (error) {
       logLocalVideoFailure("inspect", file, startedAt, error);
       throw new Error(error instanceof Error ? error.message : "The browser could not inspect this video container.");
@@ -642,16 +683,26 @@ export const cleanLocalVideo = async (
     const startedAt = performance.now();
     try {
       const selectedIdSet = new Set(selected.map((entry) => entry.id));
-      const outputName = getOutputFileName(file.name, "clean");
-      const extension = getVideoFormat(file);
+      let container = inspectedVideoContainers.get(file);
+      if (!container) {
+        const data = await probeVideo(file, "probe");
+        container = validateVideoProbe(file, data, "probe");
+        inspectedVideoContainers.set(file, container);
+      }
+      const requestedOutputName = getOutputFileName(file.name, "clean");
+      const outputName = getExtension(requestedOutputName)
+        ? requestedOutputName
+        : `${requestedOutputName.replace(/\.+$/, "")}.${container.extension}`;
 
       const outputData = await withMountedFile(file, async (ffmpeg, inputPath) => {
-        const outputPath = `output-${crypto.randomUUID().replace(/-/g, "")}${extension ? `.${extension}` : ""}`;
+        const outputPath = `output-${crypto.randomUUID().replace(/-/g, "")}.${container.extension}`;
         const args = [
           "-y",
           "-hide_banner",
           "-loglevel",
           "error",
+          "-f",
+          container.demuxer,
           "-i",
           inputPath,
           "-map",
@@ -680,7 +731,7 @@ export const cleanLocalVideo = async (
             args.push(`-metadata:c:${entry.chapterIndex ?? 0}`, `${entry.key}=${entry.value}`);
         });
 
-        args.push(outputPath);
+        args.push("-f", container.muxer, outputPath);
 
         const progressHandler = ({ progress }: { progress: number }) => {
           onProgress?.(Math.max(0, Math.min(100, Math.round(progress * 100))));
@@ -724,8 +775,10 @@ export const cleanLocalVideo = async (
         }
       });
 
-      const outputFile = new File([outputData], outputName, { type: getVideoMimeType(file) });
-      const verifiedEntries = probeDataToEntries(await probeVideo(outputFile, "verify"), extension);
+      const outputFile = new File([outputData], outputName, { type: container.mimeType });
+      const verifiedData = await probeVideo(outputFile, "verify");
+      const verifiedContainer = validateVideoProbe(outputFile, verifiedData, "verify");
+      const verifiedEntries = probeDataToEntries(verifiedData, verifiedContainer.extension);
 
       return {
         blob: outputFile,

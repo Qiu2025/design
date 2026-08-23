@@ -57,7 +57,7 @@ export type SelectedMetadataEntry = Pick<MetadataEntry, "scope" | "key" | "strea
 
 export type VerificationReport = {
   removed: MetadataEntry[];
-  preserved: MetadataEntry[];
+  notSelected: MetadataEntry[];
   unresolved: MetadataEntry[];
 };
 
@@ -285,7 +285,7 @@ export const buildVerificationReport = (
 
   return {
     removed: selected.filter((entry) => !unresolvedIds.has(entry.id)),
-    preserved: before.filter((entry) => !selectedIds.has(entry.id)),
+    notSelected: before.filter((entry) => !selectedIds.has(entry.id)),
     unresolved,
   };
 };

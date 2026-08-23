@@ -1,4 +1,4 @@
-import { getOutputFileName, isSupportedImageExtension, isSupportedImageType } from "@/utils/media";
+import { getOutputFileName } from "@/utils/media";
 import {
   buildVerificationReport,
   classifyMetadata,
@@ -7,11 +7,34 @@ import {
   type VerificationReport,
 } from "@/utils/metadata";
 
+type ImageFormat = "jpeg" | "png" | "webp" | "gif" | "bmp" | "tiff" | "svg";
+
 const EXIFTOOL_ASSET_URL = "/api/metadata/assets/zeroperl.wasm";
-const CORE_IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp"]);
-const OPTIONAL_IMAGE_EXTENSIONS = new Set(["gif", "bmp", "tif", "tiff", "svg"]);
+const CORE_IMAGE_FORMATS = new Set<ImageFormat>(["jpeg", "png", "webp"]);
+const OPTIONAL_IMAGE_FORMATS = new Set<ImageFormat>(["gif", "bmp", "tiff", "svg"]);
 const NON_EMBEDDED_GROUPS = new Set(["System", "File", "ExifTool", "Composite"]);
 const PNG_TEXT_CHUNKS = new Set(["tEXt", "zTXt", "iTXt"]);
+
+const IMAGE_FORMAT_DETAILS: Record<
+  ImageFormat,
+  { canonicalExtension: string; extensions: readonly string[]; mimeType: string }
+> = {
+  jpeg: { canonicalExtension: "jpg", extensions: ["jpg", "jpeg"], mimeType: "image/jpeg" },
+  png: { canonicalExtension: "png", extensions: ["png"], mimeType: "image/png" },
+  webp: { canonicalExtension: "webp", extensions: ["webp"], mimeType: "image/webp" },
+  gif: { canonicalExtension: "gif", extensions: ["gif"], mimeType: "image/gif" },
+  bmp: { canonicalExtension: "bmp", extensions: ["bmp"], mimeType: "image/bmp" },
+  tiff: { canonicalExtension: "tiff", extensions: ["tif", "tiff"], mimeType: "image/tiff" },
+  svg: { canonicalExtension: "svg", extensions: ["svg"], mimeType: "image/svg+xml" },
+};
+
+const imageFormatByExtension = new Map<string, ImageFormat>(
+  Object.entries(IMAGE_FORMAT_DETAILS).flatMap(([format, details]) =>
+    details.extensions.map((extension) => [extension, format as ImageFormat]),
+  ),
+);
+
+const detectedImageFormats = new WeakMap<File, ImageFormat>();
 
 const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
 
@@ -20,40 +43,39 @@ const getExtension = (fileName: string) => {
   return dotIndex === -1 ? "" : fileName.slice(dotIndex + 1).toLowerCase();
 };
 
-const getImageFormat = (file: File) => {
-  const extension = getExtension(file.name);
-  if (extension) return extension;
+const getImageFormatFromExtension = (fileName: string) => imageFormatByExtension.get(getExtension(fileName));
 
-  return (
-    {
-      "image/jpeg": "jpeg",
-      "image/png": "png",
-      "image/webp": "webp",
-      "image/gif": "gif",
-      "image/bmp": "bmp",
-      "image/tiff": "tiff",
-      "image/svg+xml": "svg",
-    }[file.type] || ""
-  );
+const getExiftoolValue = (tags: Record<string, unknown>, qualifiedKey: string) => {
+  const match = Object.entries(tags).find(([key]) => key.toLowerCase() === qualifiedKey.toLowerCase());
+  return typeof match?.[1] === "string" ? match[1].trim().toLowerCase() : "";
 };
 
-const getImageMimeType = (file: File) => {
-  if (file.type) return file.type;
+const getDetectedImageFormat = (tags: Record<string, unknown>): ImageFormat | null => {
+  const extension = getExiftoolValue(tags, "File:FileTypeExtension");
+  const fileType = getExiftoolValue(tags, "File:FileType");
+  return imageFormatByExtension.get(extension) || imageFormatByExtension.get(fileType) || null;
+};
+
+const validateDetectedImageFormat = (file: File, tags: Record<string, unknown>) => {
+  const detectedFormat = getDetectedImageFormat(tags);
+  if (!detectedFormat) {
+    throw new Error("The file contents are not a supported image format.");
+  }
 
   const extension = getExtension(file.name);
-  return (
-    {
-      jpg: "image/jpeg",
-      jpeg: "image/jpeg",
-      png: "image/png",
-      webp: "image/webp",
-      gif: "image/gif",
-      bmp: "image/bmp",
-      tif: "image/tiff",
-      tiff: "image/tiff",
-      svg: "image/svg+xml",
-    }[extension] || "application/octet-stream"
-  );
+  if (extension && getImageFormatFromExtension(file.name) !== detectedFormat) {
+    throw new Error(`The file contents do not match its .${extension} extension.`);
+  }
+
+  detectedImageFormats.set(file, detectedFormat);
+  return detectedFormat;
+};
+
+const getOutputImageName = (fileName: string, format: ImageFormat) => {
+  if (getExtension(fileName)) return getOutputFileName(fileName, "clean");
+
+  const baseName = fileName.endsWith(".") ? fileName.slice(0, -1) : fileName;
+  return `${baseName || "image"}-clean.${IMAGE_FORMAT_DETAILS[format].canonicalExtension}`;
 };
 
 const exiftoolFetch = (...args: unknown[]) => {
@@ -151,18 +173,22 @@ const stripSelectedPngTextChunks = (buffer: ArrayBuffer, selected: MetadataEntry
 };
 
 export const getLocalImageSupport = (file: File) => {
-  const extension = getImageFormat(file);
-  const isRecognized = isSupportedImageType(file.type) || isSupportedImageExtension(file.name);
+  const extension = getExtension(file.name);
 
-  if (!isRecognized) {
+  if (!extension) {
+    return { supported: true, guaranteed: false, reason: null };
+  }
+
+  const format = getImageFormatFromExtension(file.name);
+  if (!format) {
     return { supported: false, guaranteed: false, reason: "This image format is not supported." };
   }
 
-  if (CORE_IMAGE_EXTENSIONS.has(extension)) {
+  if (CORE_IMAGE_FORMATS.has(format)) {
     return { supported: true, guaranteed: true, reason: null };
   }
 
-  if (OPTIONAL_IMAGE_EXTENSIONS.has(extension)) {
+  if (OPTIONAL_IMAGE_FORMATS.has(format)) {
     return {
       supported: true,
       guaranteed: false,
@@ -173,7 +199,7 @@ export const getLocalImageSupport = (file: File) => {
   return { supported: false, guaranteed: false, reason: "This image format is not supported locally." };
 };
 
-export const inspectLocalImage = async (file: File): Promise<MetadataEntry[]> => {
+const inspectLocalImageWithFormat = async (file: File) => {
   const support = getLocalImageSupport(file);
   if (!support.supported) throw new Error(support.reason || "Unsupported image format.");
 
@@ -187,11 +213,17 @@ export const inspectLocalImage = async (file: File): Promise<MetadataEntry[]> =>
   if (!result.success) throw new Error(result.error || "ExifTool could not inspect this image.");
 
   const tags = result.data[0] || {};
-  return Object.entries(tags)
+  const format = validateDetectedImageFormat(file, tags);
+  const entries = Object.entries(tags)
     .map(([key, value]) => createImageEntry(key, value))
     .filter((entry): entry is MetadataEntry => Boolean(entry))
     .sort((a, b) => a.group.localeCompare(b.group) || a.label.localeCompare(b.label));
+
+  return { entries, format };
 };
+
+export const inspectLocalImage = async (file: File): Promise<MetadataEntry[]> =>
+  (await inspectLocalImageWithFormat(file)).entries;
 
 export type LocalImageCleanResult = {
   blob: Blob;
@@ -207,6 +239,8 @@ export const cleanLocalImage = async (
   const selected = entries.filter((entry) => selectedIds.has(entry.id) && !entry.protected);
   if (selected.length === 0) throw new Error("Select at least one removable metadata field.");
 
+  const sourceFormat = detectedImageFormats.get(file) || (await inspectLocalImageWithFormat(file)).format;
+
   const { writeMetadata } = await import("@uswriting/exiftool");
   const deleteMap = Object.fromEntries(selected.map((entry) => [entry.key, ""]));
   const result = await writeMetadata(file, deleteMap, {
@@ -216,16 +250,19 @@ export const cleanLocalImage = async (
 
   if (!result.success) throw new Error(result.error || "ExifTool could not clean this image without converting it.");
 
-  const strippedBuffer =
-    getImageFormat(file) === "png" ? stripSelectedPngTextChunks(result.data, selected) : result.data;
-  const outputName = getOutputFileName(file.name, "clean");
-  const outputFile = new File([strippedBuffer], outputName, { type: getImageMimeType(file) });
-  const verifiedEntries = await inspectLocalImage(outputFile);
+  const strippedBuffer = sourceFormat === "png" ? stripSelectedPngTextChunks(result.data, selected) : result.data;
+  const outputName = getOutputImageName(file.name, sourceFormat);
+  const outputFile = new File([strippedBuffer], outputName, { type: IMAGE_FORMAT_DETAILS[sourceFormat].mimeType });
+  const verifiedImage = await inspectLocalImageWithFormat(outputFile);
+
+  if (verifiedImage.format !== sourceFormat) {
+    throw new Error("The cleaned image format does not match the original file.");
+  }
 
   return {
     blob: outputFile,
     fileName: outputName,
-    report: buildVerificationReport(entries, verifiedEntries, selectedIds),
+    report: buildVerificationReport(entries, verifiedImage.entries, selectedIds),
   };
 };
 

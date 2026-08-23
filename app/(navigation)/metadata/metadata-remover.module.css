@@ -1041,7 +1041,7 @@
   color: hsl(142, 60%, 58%);
 }
 
-.reportSectionPreserved .reportSectionHeader {
+.reportSectionNotSelected .reportSectionHeader {
   color: hsl(var(--gray-11));
 }
 

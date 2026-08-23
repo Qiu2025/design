@@ -27,7 +27,7 @@ export async function GET(_request: Request, context: { params: Promise<{ asset:
     return NextResponse.json({ error: "Unknown metadata engine asset." }, { status: 404 });
   }
 
-  const body = await readFile(requestedAsset.path);
+  const body = await readFile(/* turbopackIgnore: true */ requestedAsset.path);
 
   return new NextResponse(body, {
     headers: {

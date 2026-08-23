@@ -488,7 +488,7 @@ export function MetadataRemover() {
             fileName: outputHeader ? decodeURIComponent(outputHeader) : getOutputFileName(file.name, "clean"),
             report: {
               removed: selectedEntries.filter((entry) => !unresolvedIds.has(entry.id)),
-              preserved: metadataEntries.filter((entry) => !selectedMetadata.has(entry.id)),
+              notSelected: metadataEntries.filter((entry) => !selectedMetadata.has(entry.id)),
               unresolved,
             },
           });
@@ -583,8 +583,8 @@ export function MetadataRemover() {
           <DialogHeader>
             <DialogTitle>Upload this video?</DialogTitle>
             <DialogDescription>
-              SnapBox will upload it for server processing and delete temporary files after the response. This choice is
-              remembered only for this browser session.
+              SnapBox will temporarily upload it for server processing and attempt to remove its temporary files after
+              an error or when the response ends. This choice is remembered only for this browser session.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -906,7 +906,7 @@ export function MetadataRemover() {
                       <strong>{report.removed.length}</strong> removed
                     </span>
                     <span>
-                      <strong>{report.preserved.length}</strong> preserved
+                      <strong>{report.notSelected.length}</strong> not selected
                     </span>
                     <span>
                       <strong>{report.unresolved.length}</strong> unresolved
@@ -922,7 +922,7 @@ export function MetadataRemover() {
                       <DialogHeader>
                         <DialogTitle>Cleaning report</DialogTitle>
                         <DialogDescription className={styles.visuallyHidden}>
-                          Metadata fields removed, preserved, or left unresolved after cleaning.
+                          Metadata fields removed, not selected, or left unresolved after cleaning.
                         </DialogDescription>
                       </DialogHeader>
                       <div className={styles.reportSections}>
@@ -933,9 +933,9 @@ export function MetadataRemover() {
                             tone: styles.reportSectionRemoved,
                           },
                           {
-                            label: "Preserved",
-                            entries: report.preserved,
-                            tone: styles.reportSectionPreserved,
+                            label: "Not selected",
+                            entries: report.notSelected,
+                            tone: styles.reportSectionNotSelected,
                           },
                           {
                             label: "Unresolved",

@@ -1,5 +1,10 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { getExtensionFromFileName } from "@/utils/media";
+import {
+  getClaimedVideoContainer,
+  resolveVideoContainer,
+  VideoContainerValidationError,
+  type ValidatedVideoContainer,
+} from "@/utils/media";
 import {
   classifyMetadata,
   formatMetadataValue,
@@ -12,14 +17,19 @@ import {
 
 const COMMAND_TIMEOUT_MS = 120_000;
 const MAX_STDERR_LENGTH = 64 * 1024;
+const MAX_STDOUT_LENGTH = 8 * 1024 * 1024;
 
 export type VideoCommandStage = "probe" | "probe_before" | "probe_after" | "remux";
 export type VideoCommandFailureKind = "command_failed" | "timeout" | "unavailable";
 export type VideoCommandFailureReason =
+  | "container_mismatch"
   | "invalid_data"
   | "missing_movie_header"
   | "permission_denied"
+  | "resource_limit"
   | "unknown"
+  | "unsupported_container"
+  | "unsupported_structure"
   | "unsupported_media";
 
 export class VideoCommandError extends Error {
@@ -46,9 +56,15 @@ export class VideoCommandError extends Error {
 }
 
 type ProbeData = {
-  format?: { tags?: Record<string, unknown> };
+  format?: { format_name?: string; tags?: Record<string, unknown> };
   streams?: Array<{ index: number; codec_type?: string; tags?: Record<string, unknown> }>;
   chapters?: Array<{ id?: number; tags?: Record<string, unknown> }>;
+  programs?: Array<{ program_id?: number }>;
+};
+
+export type ServerVideoInspection = {
+  container: ValidatedVideoContainer;
+  entries: MetadataEntry[];
 };
 
 const getCommandFailureReason = (stderr: string): VideoCommandFailureReason => {
@@ -60,6 +76,15 @@ const getCommandFailureReason = (stderr: string): VideoCommandFailureReason => {
   return "unknown";
 };
 
+const getCommandEnvironment = () => {
+  const environment: NodeJS.ProcessEnv = { LANG: "C", LC_ALL: "C", NODE_ENV: process.env.NODE_ENV };
+  ["LD_LIBRARY_PATH", "PATH", "PATHEXT", "SystemRoot", "WINDIR"].forEach((key) => {
+    const value = process.env[key];
+    if (value) environment[key] = value;
+  });
+  return environment;
+};
+
 const runCommand = (
   tool: "ffmpeg" | "ffprobe",
   stage: VideoCommandStage,
@@ -69,10 +94,14 @@ const runCommand = (
 ) => {
   return new Promise<string>((resolve, reject) => {
     let settled = false;
+    let forcedError: VideoCommandError | null = null;
     let processHandle: ChildProcess;
 
     try {
-      processHandle = spawn(command, args, { stdio: ["ignore", captureStdout ? "pipe" : "ignore", "pipe"] });
+      processHandle = spawn(command, args, {
+        env: getCommandEnvironment(),
+        stdio: ["ignore", captureStdout ? "pipe" : "ignore", "pipe"],
+      });
     } catch (error) {
       const kind = (error as NodeJS.ErrnoException).code === "ENOENT" ? "unavailable" : "command_failed";
       reject(new VideoCommandError(tool, stage, kind));
@@ -80,15 +109,25 @@ const runCommand = (
     }
 
     let stdout = "";
+    let stdoutLength = 0;
     let stderr = "";
-    const timeout = setTimeout(() => {
-      if (settled) return;
-      settled = true;
+    const terminate = (error: VideoCommandError) => {
+      if (settled || forcedError) return;
+      forcedError = error;
+      clearTimeout(timeout);
       processHandle.kill("SIGKILL");
-      reject(new VideoCommandError(tool, stage, "timeout"));
+    };
+    const timeout = setTimeout(() => {
+      terminate(new VideoCommandError(tool, stage, "timeout"));
     }, COMMAND_TIMEOUT_MS);
 
     processHandle.stdout?.on("data", (chunk) => {
+      if (forcedError) return;
+      stdoutLength += chunk.byteLength;
+      if (stdoutLength > MAX_STDOUT_LENGTH) {
+        terminate(new VideoCommandError(tool, stage, "command_failed", { reason: "resource_limit" }));
+        return;
+      }
       stdout += chunk.toString();
     });
     processHandle.stderr?.on("data", (chunk) => {
@@ -100,6 +139,10 @@ const runCommand = (
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
+      if (forcedError) {
+        reject(forcedError);
+        return;
+      }
       const kind = (error as NodeJS.ErrnoException).code === "ENOENT" ? "unavailable" : "command_failed";
       reject(new VideoCommandError(tool, stage, kind));
     });
@@ -107,6 +150,11 @@ const runCommand = (
       if (settled) return;
       settled = true;
       clearTimeout(timeout);
+
+      if (forcedError) {
+        reject(forcedError);
+        return;
+      }
 
       if (code === 0) {
         resolve(stdout);
@@ -183,7 +231,7 @@ const probeDataToEntries = (data: ProbeData, container: string) => {
   (data.chapters || []).forEach((chapter, position) => {
     Object.entries(chapter.tags || {}).forEach(([key, value]) => {
       const entry = createEntry("chapter", key, value, {
-        chapterIndex: chapter.id ?? position,
+        chapterIndex: position,
         sourceGroup: `Chapter ${position + 1}`,
         sourceLabel: `Chapter ${position + 1}`,
       });
@@ -194,8 +242,18 @@ const probeDataToEntries = (data: ProbeData, container: string) => {
   return entries.sort((a, b) => a.group.localeCompare(b.group) || a.label.localeCompare(b.label));
 };
 
-export const inspectVideoMetadata = async (filePath: string, stage: Exclude<VideoCommandStage, "remux"> = "probe") => {
+export const inspectVideoMetadata = async (
+  filePath: string,
+  stage: Exclude<VideoCommandStage, "remux"> = "probe",
+  identity: { fileName?: string; mimeType?: string } = {},
+) => {
   const ffprobeBinary = process.env.FFPROBE_PATH || "ffprobe";
+  const claimedFileName = identity.fileName || filePath;
+  const claimedMimeType = identity.mimeType || "";
+  const claimedContainer = getClaimedVideoContainer(claimedFileName, claimedMimeType);
+  if (!claimedContainer) {
+    throw new VideoCommandError("ffprobe", stage, "command_failed", { reason: "unsupported_container" });
+  }
   const output = await runCommand(
     "ffprobe",
     stage,
@@ -204,17 +262,36 @@ export const inspectVideoMetadata = async (filePath: string, stage: Exclude<Vide
       "-hide_banner",
       "-v",
       "error",
+      "-protocol_whitelist",
+      "file",
+      "-f",
+      claimedContainer.demuxer,
       "-print_format",
       "json",
-      "-show_format",
-      "-show_streams",
-      "-show_chapters",
+      "-show_entries",
+      "format=format_name:format_tags:stream=index,codec_type:stream_tags:chapter=id:chapter_tags:program=program_id",
       filePath,
     ],
     true,
   );
 
-  return probeDataToEntries(JSON.parse(output) as ProbeData, getExtensionFromFileName(filePath));
+  const data = JSON.parse(output) as ProbeData;
+  let container: ValidatedVideoContainer;
+
+  try {
+    container = resolveVideoContainer(claimedFileName, claimedMimeType, data.format?.format_name);
+  } catch (error) {
+    if (error instanceof VideoContainerValidationError) {
+      throw new VideoCommandError("ffprobe", stage, "command_failed", { reason: error.code });
+    }
+    throw error;
+  }
+
+  if ((data.programs || []).length > 0) {
+    throw new VideoCommandError("ffprobe", stage, "command_failed", { reason: "unsupported_structure" });
+  }
+
+  return { container, entries: probeDataToEntries(data, container.extension) } satisfies ServerVideoInspection;
 };
 
 export const removeVideoMetadata = async (
@@ -222,6 +299,8 @@ export const removeVideoMetadata = async (
   outputPath: string,
   before: MetadataEntry[],
   selected: SelectedMetadataEntry[],
+  inputDemuxer: string,
+  outputMuxer: string,
 ) => {
   const ffmpegBinary = process.env.FFMPEG_PATH || "ffmpeg";
   const args = [
@@ -229,6 +308,11 @@ export const removeVideoMetadata = async (
     "-hide_banner",
     "-loglevel",
     "error",
+    "-nostdin",
+    "-protocol_whitelist",
+    "file",
+    "-f",
+    inputDemuxer,
     "-i",
     inputPath,
     "-map",
@@ -255,7 +339,7 @@ export const removeVideoMetadata = async (
     if (entry.scope === "chapter") args.push(`-metadata:c:${entry.chapterIndex ?? 0}`, `${entry.key}=${entry.value}`);
   });
 
-  args.push(outputPath);
+  args.push("-f", outputMuxer, outputPath);
   await runCommand("ffmpeg", "remux", ffmpegBinary, args, false);
 };
 
