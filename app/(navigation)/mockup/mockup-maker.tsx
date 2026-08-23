@@ -36,6 +36,9 @@ const BACKGROUND_PRESETS = [
   { label: "Mint", value: "#b8e5d1" },
 ];
 
+const DEFAULT_GRADIENT_START = "#7c3aed";
+const DEFAULT_GRADIENT_END = "#f59e0b";
+
 const DEFAULT_DEVICE: DeviceName = "iPhone 17";
 
 const DEFAULT_DEVICE_COLORS: Partial<Record<DeviceName, string>> = {
@@ -115,8 +118,18 @@ type HsvColor = {
   value: number;
 };
 
+type BackgroundMode = "solid" | "gradient";
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function isHexColor(value: string) {
+  return /^#[0-9a-f]{6}$/i.test(value);
+}
+
+function isGradientBackground(value: string) {
+  return value.includes("gradient(");
 }
 
 function hexToHsv(hex: string): HsvColor {
@@ -179,8 +192,13 @@ export function MockupMaker() {
   const [imagePositionY, setImagePositionY] = useState(0);
   const [frameScale, setFrameScale] = useState(getInitialFrameScale(DEFAULT_DEVICE));
   const [background, setBackground] = useState(BACKGROUND_PRESETS[0].value);
+  const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>("solid");
   const [customColorValue, setCustomColorValue] = useState(BACKGROUND_PRESETS[0].value);
   const [colorPickerHsv, setColorPickerHsv] = useState(() => hexToHsv(BACKGROUND_PRESETS[0].value));
+  const [gradientStart, setGradientStart] = useState(DEFAULT_GRADIENT_START);
+  const [gradientEnd, setGradientEnd] = useState(DEFAULT_GRADIENT_END);
+  const [gradientAngle, setGradientAngle] = useState(135);
+  const [activeGradientStop, setActiveGradientStop] = useState<"start" | "end">("start");
   const [transparentBackground, setTransparentBackground] = useState(true);
   const [isCustomColorOpen, setIsCustomColorOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -191,10 +209,11 @@ export function MockupMaker() {
   const [canvasWidth, setCanvasWidth] = useState(0);
   const canvasRef = useRef<HTMLDivElement>(null);
   const customColorRef = useRef<HTMLDivElement>(null);
-  const customColorTriggerRef = useRef<HTMLButtonElement>(null);
   const customColorPopoverRef = useRef<HTMLDivElement>(null);
+  const customColorDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [customColorPosition, setCustomColorPosition] = useState<{ top: number; left: number } | null>(null);
+  const [isCustomColorDragging, setIsCustomColorDragging] = useState(false);
 
   const colorOptions = useMemo(() => Array.from(DeviceOptions[selectedDevice].colors), [selectedDevice]);
   const supportsLandscape = DeviceOptions[selectedDevice].hasLandscape;
@@ -208,30 +227,101 @@ export function MockupMaker() {
   const effectiveFrameScale = Math.min(frameScale, maxFrameScale);
   const isCustomBackground =
     !transparentBackground &&
-    !BACKGROUND_PRESETS.some((preset) => preset.value.toLowerCase() === background.toLowerCase());
+    (backgroundMode === "gradient" ||
+      !BACKGROUND_PRESETS.some((preset) => preset.value.toLowerCase() === background.toLowerCase()));
+
+  const activeGradientColor = activeGradientStop === "start" ? gradientStart : gradientEnd;
+  const gradientBackground = `linear-gradient(${gradientAngle}deg, ${gradientStart} 0%, ${gradientEnd} 100%)`;
 
   const updateBackground = (value: string) => {
     setBackground(value);
+    setBackgroundMode("solid");
     setCustomColorValue(value);
     setTransparentBackground(false);
   };
 
+  const updateGradient = (start: string, end: string, angle = gradientAngle) => {
+    setBackground(`linear-gradient(${angle}deg, ${start} 0%, ${end} 100%)`);
+    setBackgroundMode("gradient");
+    setTransparentBackground(false);
+  };
+
+  const activateGradient = () => {
+    const start = isHexColor(background) ? background : gradientStart;
+    setGradientStart(start);
+    setActiveGradientStop("start");
+    setCustomColorValue(start);
+    setColorPickerHsv(hexToHsv(start));
+    updateGradient(start, gradientEnd);
+  };
+
+  const activateSolid = () => {
+    if (backgroundMode === "solid") return;
+    updateBackground(activeGradientColor);
+    setColorPickerHsv(hexToHsv(activeGradientColor));
+  };
+
+  const updateGradientStop = (value: string) => {
+    const start = activeGradientStop === "start" ? value : gradientStart;
+    const end = activeGradientStop === "end" ? value : gradientEnd;
+    if (activeGradientStop === "start") setGradientStart(value);
+    else setGradientEnd(value);
+    setCustomColorValue(value);
+    updateGradient(start, end);
+  };
+
   const handleCustomColorTextChange = (value: string) => {
     setCustomColorValue(value);
-    if (/^#[0-9a-f]{6}$/i.test(value)) {
-      updateBackground(value);
+    if (isHexColor(value)) {
+      if (backgroundMode === "gradient") updateGradientStop(value);
+      else updateBackground(value);
       setColorPickerHsv(hexToHsv(value));
     }
   };
 
   const applyColorPickerValue = (value: HsvColor) => {
     setColorPickerHsv(value);
-    updateBackground(hsvToHex(value));
+    const hex = hsvToHex(value);
+    if (backgroundMode === "gradient") updateGradientStop(hex);
+    else updateBackground(hex);
   };
 
   const handleColorPickerOpen = () => {
-    if (!isCustomColorOpen) setColorPickerHsv(hexToHsv(background));
+    if (!isCustomColorOpen) {
+      const color = backgroundMode === "gradient" ? activeGradientColor : background;
+      setColorPickerHsv(hexToHsv(color));
+    }
     setIsCustomColorOpen((value) => !value);
+  };
+
+  const handleCustomColorWindowPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest("button") || !customColorPosition) return;
+
+    customColorDragRef.current = {
+      offsetX: event.clientX - customColorPosition.left,
+      offsetY: event.clientY - customColorPosition.top,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsCustomColorDragging(true);
+  };
+
+  const handleCustomColorWindowPointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = customColorDragRef.current;
+    if (!drag || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+
+    const popoverWidth = 230;
+    const popoverHeight = 280;
+    setCustomColorPosition({
+      top: clamp(event.clientY - drag.offsetY, 12, Math.max(12, window.innerHeight - popoverHeight - 12)),
+      left: clamp(event.clientX - drag.offsetX, 12, Math.max(12, window.innerWidth - popoverWidth - 12)),
+    });
+  };
+
+  const handleCustomColorWindowPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    customColorDragRef.current = null;
+    setIsCustomColorDragging(false);
   };
 
   const updateSaturationAndValue = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -313,15 +403,16 @@ export function MockupMaker() {
     }
 
     const updateCustomColorPosition = () => {
-      const trigger = customColorTriggerRef.current;
-      if (!trigger) return;
+      const preview = canvasRef.current;
+      if (!preview) return;
 
-      const bounds = trigger.getBoundingClientRect();
+      const bounds = preview.getBoundingClientRect();
       const popoverWidth = 230;
-      const popoverHeight = 270;
+      const popoverHeight = 280;
+      const inset = 16;
       setCustomColorPosition({
-        top: Math.max(12, Math.min(bounds.top, window.innerHeight - popoverHeight - 12)),
-        left: Math.max(12, Math.min(bounds.right + 8, window.innerWidth - popoverWidth - 12)),
+        top: clamp(bounds.top + inset, 12, Math.max(12, window.innerHeight - popoverHeight - 12)),
+        left: clamp(bounds.right - popoverWidth - inset, 12, Math.max(12, window.innerWidth - popoverWidth - 12)),
       });
     };
 
@@ -696,7 +787,6 @@ export function MockupMaker() {
                   ))}
                   <button
                     type="button"
-                    ref={customColorTriggerRef}
                     className={cn(styles.customColorTrigger, isCustomBackground && styles.customColorTriggerSelected)}
                     onClick={handleColorPickerOpen}
                     aria-expanded={isCustomColorOpen}
@@ -709,7 +799,11 @@ export function MockupMaker() {
                         styles.customColorTriggerIcon,
                         isCustomBackground && styles.customColorTriggerSwatch,
                       )}
-                      style={isCustomBackground ? { background } : undefined}
+                      style={
+                        isCustomBackground
+                          ? { background: backgroundMode === "gradient" ? gradientBackground : background }
+                          : undefined
+                      }
                       aria-hidden="true"
                     >
                       {!isCustomBackground && "+"}
@@ -722,12 +816,21 @@ export function MockupMaker() {
                     <div
                       ref={customColorPopoverRef}
                       id="custom-background-popover"
-                      className={styles.customColorPopover}
+                      className={cn(
+                        styles.customColorPopover,
+                        isCustomColorDragging && styles.customColorPopoverDragging,
+                      )}
                       role="dialog"
                       aria-label="Custom background color"
                       style={{ top: customColorPosition.top, left: customColorPosition.left }}
                     >
-                      <div className={styles.customColorPopoverHeader}>
+                      <div
+                        className={styles.customColorPopoverHeader}
+                        onPointerDown={handleCustomColorWindowPointerDown}
+                        onPointerMove={handleCustomColorWindowPointerMove}
+                        onPointerUp={handleCustomColorWindowPointerUp}
+                        onPointerCancel={handleCustomColorWindowPointerUp}
+                      >
                         <span>Custom background</span>
                         <button
                           type="button"
@@ -738,6 +841,96 @@ export function MockupMaker() {
                           ×
                         </button>
                       </div>
+                      <div className={styles.customColorModes} role="tablist" aria-label="Background type">
+                        <button
+                          type="button"
+                          className={cn(
+                            styles.customColorMode,
+                            backgroundMode === "solid" && styles.customColorModeActive,
+                          )}
+                          onClick={activateSolid}
+                          role="tab"
+                          aria-selected={backgroundMode === "solid"}
+                        >
+                          Solid
+                        </button>
+                        <button
+                          type="button"
+                          className={cn(
+                            styles.customColorMode,
+                            backgroundMode === "gradient" && styles.customColorModeActive,
+                          )}
+                          onClick={activateGradient}
+                          role="tab"
+                          aria-selected={backgroundMode === "gradient"}
+                        >
+                          Gradient
+                        </button>
+                      </div>
+                      {backgroundMode === "gradient" && (
+                        <div className={styles.gradientOptions}>
+                          <div
+                            className={styles.gradientPreview}
+                            style={{ backgroundImage: gradientBackground }}
+                            aria-label="Gradient preview"
+                          />
+                          <div className={styles.gradientStops} aria-label="Gradient colors">
+                            <button
+                              type="button"
+                              className={cn(
+                                styles.gradientStop,
+                                activeGradientStop === "start" && styles.gradientStopActive,
+                              )}
+                              onClick={() => {
+                                setActiveGradientStop("start");
+                                setCustomColorValue(gradientStart);
+                                setColorPickerHsv(hexToHsv(gradientStart));
+                              }}
+                              aria-label="First gradient color"
+                              aria-pressed={activeGradientStop === "start"}
+                            >
+                              <span>Start</span>
+                              <span className={styles.gradientStopSwatch} style={{ background: gradientStart }} />
+                            </button>
+                            <span className={styles.gradientStopsArrow} aria-hidden="true">
+                              →
+                            </span>
+                            <button
+                              type="button"
+                              className={cn(
+                                styles.gradientStop,
+                                activeGradientStop === "end" && styles.gradientStopActive,
+                              )}
+                              onClick={() => {
+                                setActiveGradientStop("end");
+                                setCustomColorValue(gradientEnd);
+                                setColorPickerHsv(hexToHsv(gradientEnd));
+                              }}
+                              aria-label="Second gradient color"
+                              aria-pressed={activeGradientStop === "end"}
+                            >
+                              <span>End</span>
+                              <span className={styles.gradientStopSwatch} style={{ background: gradientEnd }} />
+                            </button>
+                          </div>
+                          <label className={styles.gradientAngle}>
+                            <span>
+                              Angle <output>{gradientAngle}°</output>
+                            </span>
+                            <input
+                              type="range"
+                              min="0"
+                              max="360"
+                              value={gradientAngle}
+                              onChange={(event) => {
+                                const angle = Number(event.target.value);
+                                setGradientAngle(angle);
+                                updateGradient(gradientStart, gradientEnd, angle);
+                              }}
+                            />
+                          </label>
+                        </div>
+                      )}
                       <div
                         className={styles.customColorArea}
                         role="slider"
@@ -791,7 +984,11 @@ export function MockupMaker() {
                         />
                       </div>
                       <div className={styles.customColorFields}>
-                        <span className={styles.customColorPreview} style={{ background }} aria-hidden="true" />
+                        <span
+                          className={styles.customColorPreview}
+                          style={{ background: backgroundMode === "gradient" ? activeGradientColor : background }}
+                          aria-hidden="true"
+                        />
                         <label className={styles.hexField}>
                           <span>HEX</span>
                           <input
@@ -834,7 +1031,15 @@ export function MockupMaker() {
             <div
               ref={canvasRef}
               className={cn(styles.canvas, transparentBackground && styles.canvasTransparent)}
-              style={transparentBackground ? undefined : { background }}
+              style={
+                transparentBackground
+                  ? undefined
+                  : {
+                      backgroundColor: isGradientBackground(background) ? undefined : background,
+                      backgroundImage: isGradientBackground(background) ? background : undefined,
+                      backgroundClip: "padding-box",
+                    }
+              }
             >
               <div className={styles.canvasLabel}>Preview</div>
               <div className={styles.frameCenter}>
