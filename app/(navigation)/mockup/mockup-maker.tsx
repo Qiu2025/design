@@ -123,6 +123,10 @@ export function MockupMaker() {
 
   const colorOptions = useMemo(() => Array.from(DeviceOptions[selectedDevice].colors), [selectedDevice]);
   const supportsLandscape = DeviceOptions[selectedDevice].hasLandscape;
+  const deviceDimensions =
+    landscape && supportsLandscape
+      ? `${DeviceOptions[selectedDevice].height} × ${DeviceOptions[selectedDevice].width}`
+      : `${DeviceOptions[selectedDevice].width} × ${DeviceOptions[selectedDevice].height}`;
   const maxFrameScale = canvasWidth
     ? Math.max(0.1, (canvasWidth - 32) / getFrameBaseWidth(selectedDevice, landscape))
     : 1;
@@ -358,6 +362,11 @@ export function MockupMaker() {
                   </optgroup>
                 ))}
               </select>
+
+              <div className={styles.subControl}>
+                <span className={styles.controlLabel}>Dimensions</span>
+                <span className={styles.controlLabel}>{deviceDimensions} px</span>
+              </div>
 
               {colorOptions.length > 0 && (
                 <div className={styles.subControl}>
