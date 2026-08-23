@@ -2,7 +2,18 @@
 
 import { MockFrame, DeviceOptions, type DeviceName, type MockFrameProps } from "react-mockframe";
 import { DownloadIcon, ImageIcon, RotateClockwiseIcon, TrashIcon } from "@raycast/icons";
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
+import { createPortal } from "react-dom";
 
 import { NavigationActions } from "@/components/navigation";
 import { Button } from "@/components/button";
@@ -98,6 +109,63 @@ function getSwatchColor(color: string) {
   return DEVICE_COLOR_VALUES[color] ?? color;
 }
 
+type HsvColor = {
+  hue: number;
+  saturation: number;
+  value: number;
+};
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function hexToHsv(hex: string): HsvColor {
+  const value = Number.parseInt(hex.slice(1), 16);
+  const red = ((value >> 16) & 255) / 255;
+  const green = ((value >> 8) & 255) / 255;
+  const blue = (value & 255) / 255;
+  const max = Math.max(red, green, blue);
+  const min = Math.min(red, green, blue);
+  const delta = max - min;
+  let hue = 0;
+
+  if (delta) {
+    if (max === red) hue = 60 * (((green - blue) / delta) % 6);
+    else if (max === green) hue = 60 * ((blue - red) / delta + 2);
+    else hue = 60 * ((red - green) / delta + 4);
+  }
+
+  return {
+    hue: hue < 0 ? hue + 360 : hue,
+    saturation: max ? delta / max : 0,
+    value: max,
+  };
+}
+
+function hsvToHex({ hue, saturation, value }: HsvColor) {
+  const chroma = value * saturation;
+  const match = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const offset = value - chroma;
+  const [red, green, blue] =
+    hue < 60
+      ? [chroma, match, 0]
+      : hue < 120
+        ? [match, chroma, 0]
+        : hue < 180
+          ? [0, chroma, match]
+          : hue < 240
+            ? [0, match, chroma]
+            : hue < 300
+              ? [match, 0, chroma]
+              : [chroma, 0, match];
+  const toHex = (channel: number) =>
+    Math.round((channel + offset) * 255)
+      .toString(16)
+      .padStart(2, "0");
+
+  return `#${toHex(red)}${toHex(green)}${toHex(blue)}`;
+}
+
 export function MockupMaker() {
   const [selectedDevice, setSelectedDevice] = useState<DeviceName>(DEFAULT_DEVICE);
   const [selectedColor, setSelectedColor] = useState<string | undefined>(getInitialColor(DEFAULT_DEVICE));
@@ -111,7 +179,10 @@ export function MockupMaker() {
   const [imagePositionY, setImagePositionY] = useState(0);
   const [frameScale, setFrameScale] = useState(getInitialFrameScale(DEFAULT_DEVICE));
   const [background, setBackground] = useState(BACKGROUND_PRESETS[0].value);
+  const [customColorValue, setCustomColorValue] = useState(BACKGROUND_PRESETS[0].value);
+  const [colorPickerHsv, setColorPickerHsv] = useState(() => hexToHsv(BACKGROUND_PRESETS[0].value));
   const [transparentBackground, setTransparentBackground] = useState(true);
+  const [isCustomColorOpen, setIsCustomColorOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isReading, setIsReading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -119,7 +190,11 @@ export function MockupMaker() {
   const [isMounted, setIsMounted] = useState(false);
   const [canvasWidth, setCanvasWidth] = useState(0);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const customColorRef = useRef<HTMLDivElement>(null);
+  const customColorTriggerRef = useRef<HTMLButtonElement>(null);
+  const customColorPopoverRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [customColorPosition, setCustomColorPosition] = useState<{ top: number; left: number } | null>(null);
 
   const colorOptions = useMemo(() => Array.from(DeviceOptions[selectedDevice].colors), [selectedDevice]);
   const supportsLandscape = DeviceOptions[selectedDevice].hasLandscape;
@@ -131,10 +206,133 @@ export function MockupMaker() {
     ? Math.max(0.1, (canvasWidth - 32) / getFrameBaseWidth(selectedDevice, landscape))
     : 1;
   const effectiveFrameScale = Math.min(frameScale, maxFrameScale);
+  const isCustomBackground =
+    !transparentBackground &&
+    !BACKGROUND_PRESETS.some((preset) => preset.value.toLowerCase() === background.toLowerCase());
+
+  const updateBackground = (value: string) => {
+    setBackground(value);
+    setCustomColorValue(value);
+    setTransparentBackground(false);
+  };
+
+  const handleCustomColorTextChange = (value: string) => {
+    setCustomColorValue(value);
+    if (/^#[0-9a-f]{6}$/i.test(value)) {
+      updateBackground(value);
+      setColorPickerHsv(hexToHsv(value));
+    }
+  };
+
+  const applyColorPickerValue = (value: HsvColor) => {
+    setColorPickerHsv(value);
+    updateBackground(hsvToHex(value));
+  };
+
+  const handleColorPickerOpen = () => {
+    if (!isCustomColorOpen) setColorPickerHsv(hexToHsv(background));
+    setIsCustomColorOpen((value) => !value);
+  };
+
+  const updateSaturationAndValue = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    applyColorPickerValue({
+      ...colorPickerHsv,
+      saturation: clamp((event.clientX - bounds.left) / bounds.width, 0, 1),
+      value: clamp(1 - (event.clientY - bounds.top) / bounds.height, 0, 1),
+    });
+  };
+
+  const updateHue = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    applyColorPickerValue({
+      ...colorPickerHsv,
+      hue: clamp(((event.clientX - bounds.left) / bounds.width) * 360, 0, 360),
+    });
+  };
+
+  const handleSaturationAndValueKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const step = 0.05;
+    const next = { ...colorPickerHsv };
+
+    if (event.key === "ArrowLeft") next.saturation -= step;
+    else if (event.key === "ArrowRight") next.saturation += step;
+    else if (event.key === "ArrowDown") next.value -= step;
+    else if (event.key === "ArrowUp") next.value += step;
+    else return;
+
+    event.preventDefault();
+    applyColorPickerValue({
+      ...next,
+      saturation: clamp(next.saturation, 0, 1),
+      value: clamp(next.value, 0, 1),
+    });
+  };
+
+  const handleHueKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const step = 5;
+    let hue = colorPickerHsv.hue;
+
+    if (event.key === "ArrowLeft" || event.key === "ArrowDown") hue -= step;
+    else if (event.key === "ArrowRight" || event.key === "ArrowUp") hue += step;
+    else return;
+
+    event.preventDefault();
+    applyColorPickerValue({ ...colorPickerHsv, hue: (hue + 360) % 360 });
+  };
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!isCustomColorOpen) return;
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!customColorRef.current?.contains(target) && !customColorPopoverRef.current?.contains(target)) {
+        setIsCustomColorOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsCustomColorOpen(false);
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isCustomColorOpen]);
+
+  useEffect(() => {
+    if (!isCustomColorOpen) {
+      setCustomColorPosition(null);
+      return;
+    }
+
+    const updateCustomColorPosition = () => {
+      const trigger = customColorTriggerRef.current;
+      if (!trigger) return;
+
+      const bounds = trigger.getBoundingClientRect();
+      const popoverWidth = 230;
+      const popoverHeight = 270;
+      setCustomColorPosition({
+        top: Math.max(12, Math.min(bounds.top, window.innerHeight - popoverHeight - 12)),
+        left: Math.max(12, Math.min(bounds.right + 8, window.innerWidth - popoverWidth - 12)),
+      });
+    };
+
+    updateCustomColorPosition();
+    window.addEventListener("resize", updateCustomColorPosition);
+    document.addEventListener("scroll", updateCustomColorPosition, true);
+    return () => {
+      window.removeEventListener("resize", updateCustomColorPosition);
+      document.removeEventListener("scroll", updateCustomColorPosition, true);
+    };
+  }, [isCustomColorOpen]);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -469,51 +667,150 @@ export function MockupMaker() {
               <div className={styles.sectionHeading}>
                 <h2 id="background-title">Background</h2>
               </div>
-              <div className={styles.backgroundGrid}>
-                {BACKGROUND_PRESETS.map((preset) => (
+              <div className={styles.backgroundControls} ref={customColorRef}>
+                <div className={styles.backgroundGrid}>
                   <button
-                    key={preset.value}
                     type="button"
                     className={cn(
                       styles.backgroundSwatch,
-                      !transparentBackground && background === preset.value && styles.backgroundSwatchSelected,
+                      styles.checkerSwatch,
+                      transparentBackground && styles.backgroundSwatchSelected,
                     )}
-                    style={{ background: preset.value }}
-                    onClick={() => {
-                      setBackground(preset.value);
-                      setTransparentBackground(false);
-                    }}
-                    aria-label={preset.label}
-                    aria-pressed={!transparentBackground && background === preset.value}
+                    onClick={() => setTransparentBackground((value) => !value)}
+                    aria-label="Transparent background"
+                    aria-pressed={transparentBackground}
                   />
-                ))}
-                <button
-                  type="button"
-                  className={cn(
-                    styles.backgroundSwatch,
-                    styles.checkerSwatch,
-                    transparentBackground && styles.backgroundSwatchSelected,
+                  {BACKGROUND_PRESETS.map((preset) => (
+                    <button
+                      key={preset.value}
+                      type="button"
+                      className={cn(
+                        styles.backgroundSwatch,
+                        !transparentBackground && background === preset.value && styles.backgroundSwatchSelected,
+                      )}
+                      style={{ background: preset.value }}
+                      onClick={() => updateBackground(preset.value)}
+                      aria-label={preset.label}
+                      aria-pressed={!transparentBackground && background === preset.value}
+                    />
+                  ))}
+                  <button
+                    type="button"
+                    ref={customColorTriggerRef}
+                    className={cn(styles.customColorTrigger, isCustomBackground && styles.customColorTriggerSelected)}
+                    onClick={handleColorPickerOpen}
+                    aria-expanded={isCustomColorOpen}
+                    aria-controls="custom-background-popover"
+                    aria-pressed={isCustomBackground}
+                  >
+                    <span>Custom</span>
+                    <span
+                      className={cn(
+                        styles.customColorTriggerIcon,
+                        isCustomBackground && styles.customColorTriggerSwatch,
+                      )}
+                      style={isCustomBackground ? { background } : undefined}
+                      aria-hidden="true"
+                    >
+                      {!isCustomBackground && "+"}
+                    </span>
+                  </button>
+                </div>
+                {isCustomColorOpen &&
+                  customColorPosition &&
+                  createPortal(
+                    <div
+                      ref={customColorPopoverRef}
+                      id="custom-background-popover"
+                      className={styles.customColorPopover}
+                      role="dialog"
+                      aria-label="Custom background color"
+                      style={{ top: customColorPosition.top, left: customColorPosition.left }}
+                    >
+                      <div className={styles.customColorPopoverHeader}>
+                        <span>Custom background</span>
+                        <button
+                          type="button"
+                          className={styles.customColorClose}
+                          onClick={() => setIsCustomColorOpen(false)}
+                          aria-label="Close custom color"
+                        >
+                          ×
+                        </button>
+                      </div>
+                      <div
+                        className={styles.customColorArea}
+                        role="slider"
+                        tabIndex={0}
+                        aria-label="Saturation and brightness"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={Math.round(colorPickerHsv.saturation * 100)}
+                        onPointerDown={(event) => {
+                          event.currentTarget.setPointerCapture(event.pointerId);
+                          updateSaturationAndValue(event);
+                        }}
+                        onPointerMove={(event) => {
+                          if (event.currentTarget.hasPointerCapture(event.pointerId)) updateSaturationAndValue(event);
+                        }}
+                        onKeyDown={handleSaturationAndValueKeyDown}
+                        style={{
+                          background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(${colorPickerHsv.hue} 100% 50%))`,
+                        }}
+                      >
+                        <span
+                          className={styles.customColorAreaCursor}
+                          style={{
+                            left: `${colorPickerHsv.saturation * 100}%`,
+                            top: `${(1 - colorPickerHsv.value) * 100}%`,
+                          }}
+                          aria-hidden="true"
+                        />
+                      </div>
+                      <div
+                        className={styles.customColorHue}
+                        role="slider"
+                        tabIndex={0}
+                        aria-label="Hue"
+                        aria-valuemin={0}
+                        aria-valuemax={360}
+                        aria-valuenow={Math.round(colorPickerHsv.hue)}
+                        onPointerDown={(event) => {
+                          event.currentTarget.setPointerCapture(event.pointerId);
+                          updateHue(event);
+                        }}
+                        onPointerMove={(event) => {
+                          if (event.currentTarget.hasPointerCapture(event.pointerId)) updateHue(event);
+                        }}
+                        onKeyDown={handleHueKeyDown}
+                      >
+                        <span
+                          className={styles.customColorHueCursor}
+                          style={{ left: `${(colorPickerHsv.hue / 360) * 100}%` }}
+                          aria-hidden="true"
+                        />
+                      </div>
+                      <div className={styles.customColorFields}>
+                        <span className={styles.customColorPreview} style={{ background }} aria-hidden="true" />
+                        <label className={styles.hexField}>
+                          <span>HEX</span>
+                          <input
+                            type="text"
+                            value={customColorValue}
+                            maxLength={7}
+                            spellCheck={false}
+                            onChange={(event) => handleCustomColorTextChange(event.target.value)}
+                            onBlur={() => {
+                              if (!/^#[0-9a-f]{6}$/i.test(customColorValue)) setCustomColorValue(background);
+                            }}
+                            aria-label="Hex color value"
+                          />
+                        </label>
+                      </div>
+                    </div>,
+                    document.body,
                   )}
-                  onClick={() => setTransparentBackground((value) => !value)}
-                  aria-label="Transparent background"
-                  aria-pressed={transparentBackground}
-                />
               </div>
-              <label className={styles.customColorControl}>
-                <span className={styles.customColorSwatch} style={{ background }} aria-hidden="true" />
-                <span>Custom color</span>
-                <output>{background.toUpperCase()}</output>
-                <input
-                  type="color"
-                  value={background}
-                  onChange={(event) => {
-                    setBackground(event.target.value);
-                    setTransparentBackground(false);
-                  }}
-                  className={styles.visuallyHidden}
-                  aria-label="Custom background color"
-                />
-              </label>
               <label className={styles.rangeRow}>
                 <span>
                   Frame size
