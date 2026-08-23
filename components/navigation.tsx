@@ -9,6 +9,7 @@ import { cn } from "@/utils/cn";
 import CodeImagesIcon from "@/app/assets/code-images.svg";
 import IconMakerIcon from "@/app/assets/icon-maker.svg";
 import MetadataRemoverIcon from "@/app/assets/metadata-remover.svg";
+import MockupMakerIcon from "@/app/assets/mockup-maker.svg";
 import { Button } from "./button";
 import {
   DropdownMenu,
@@ -42,13 +43,20 @@ const links = [
     description: "Remove metadata from images and videos",
     icon: MetadataRemoverIcon,
   },
+  {
+    href: "/mockup",
+    label: "Mockup Maker",
+    description: "Create device mockups from screenshots",
+    icon: MockupMakerIcon,
+  },
 ];
 
 export function Navigation() {
   const segments = useSelectedLayoutSegments();
   const segment = segments[0] || "(code)";
   const showBackButton = segments.includes("shared") ? segments.length > 1 : segments.length > 2;
-  const backHref = segment === "icon" ? "/icon" : segment === "metadata" ? "/metadata" : "/";
+  const backHref =
+    segment === "icon" ? "/icon" : segment === "metadata" ? "/metadata" : segment === "mockup" ? "/mockup" : "/";
   const activeLink =
     links.find((link) => {
       if (link.href === "/") {

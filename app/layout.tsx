@@ -1,5 +1,6 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
+import "react-mockframe/styles/mockframe.css";
 import cn from "classnames";
 import { BASE_URL } from "@/utils/common";
 import { TooltipProvider } from "@/components/tooltip";
