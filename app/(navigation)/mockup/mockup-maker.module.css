@@ -77,14 +77,6 @@
   font-weight: 500;
 }
 
-.controlValue {
-  overflow: hidden;
-  color: hsl(var(--gray-10));
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .dropZone {
   position: relative;
   display: flex;

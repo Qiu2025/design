@@ -341,7 +341,6 @@ export function MockupMaker() {
             <section className={styles.controlSection} aria-labelledby="device-section-title">
               <div className={styles.sectionHeading}>
                 <h2 id="device-section-title">Device</h2>
-                <span className={styles.controlValue}>{selectedDevice}</span>
               </div>
               <select
                 className={styles.select}
