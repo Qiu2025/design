@@ -331,9 +331,9 @@ export function MockupMaker() {
                 />
                 <ImageIcon className="h-5 w-5" />
                 <span className={styles.dropTitle}>
-                  {isReading ? "Reading image…" : imageName || "Drop an image here"}
+                  {isReading ? "Reading image…" : imageName || "Drop a screenshot here"}
                 </span>
-                <span className={styles.dropHint}>or click to browse · paste with ⌘V / Ctrl+V</span>
+                <span className={styles.dropHint}>Click to browse or paste with ⌘V / Ctrl+V</span>
               </label>
               {error && (
                 <p className={styles.errorMessage} role="alert">
