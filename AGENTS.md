@@ -29,7 +29,7 @@ There is no automated test framework or coverage threshold. Treat linting, type 
 
 ## Commit & Pull Request Guidelines
 
-Follow the history's Conventional Commit style, such as `feat(metadata): add selective inspection` or `fix(api): preserve localhost URLs`. Keep commits focused and use an optional scope for the affected feature. Pull requests should explain the user-visible impact, link relevant issues, list validation commands, and include before/after screenshots for UI changes. Document any new environment variables or deployment requirements.
+Follow the history's Conventional Commit style, such as `feat(metadata): add selective inspection` or `fix(api): preserve localhost URLs`. Keep commits focused and use an optional scope for the affected feature. For commit-worthy changes, end the response with a Conventional Commit message. Pull requests should explain the user-visible impact, link relevant issues, list validation commands, and include before/after screenshots for UI changes. Document any new environment variables or deployment requirements.
 
 ## Security & Configuration
 
