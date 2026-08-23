@@ -534,61 +534,18 @@ const probePathWithFfmpegLog = async (ffmpeg: FFmpegInstance, inputPath: string,
   }
 };
 
-const logProbeFallback = (
-  file: File,
-  stage: "probe" | "verify",
-  startedAt: number,
-  result: "error" | "success",
-  options: { error?: unknown; exitCode?: number } = {},
-) => {
-  const diagnosticError = options.error instanceof LocalVideoDiagnosticError ? options.error : null;
-  const exitCode = options.exitCode ?? diagnosticError?.exitCode;
-  const format = getVideoFormat(file);
-
-  console.warn(
-    "[metadata][local-video-diagnostic]",
-    JSON.stringify({
-      event: "local_video_probe_fallback",
-      execution: "on_device",
-      operation: stage === "probe" ? "inspect" : "clean",
-      stage,
-      result,
-      trigger: "ffprobe_wasm_abort",
-      strategy: "ffmpeg_input_log",
-      container: LOCAL_VIDEO_EXTENSIONS.has(format) ? format : "unknown",
-      sizeRange: getSizeRange(file.size),
-      durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
-      ...(exitCode === undefined ? {} : { exitCode }),
-      ...(result === "success"
-        ? {}
-        : {
-            errorCode:
-              exitCode === -1
-                ? "wasm_abort"
-                : exitCode === undefined
-                  ? "runtime_error"
-                  : exitCode === 0
-                    ? "output_error"
-                    : "ffmpeg_error",
-          }),
-    }),
-  );
-};
-
 const recoverProbeAbort = async (file: File, stage: "probe" | "verify", originalError: LocalVideoDiagnosticError) => {
-  const startedAt = performance.now();
   await discardFfmpeg();
 
   try {
     const fallback = await withMountedFile(file, (ffmpeg, inputPath) =>
       probePathWithFfmpegLog(ffmpeg, inputPath, stage),
     );
-    logProbeFallback(file, stage, startedAt, "success", { exitCode: fallback.exitCode });
     if (fallback.exitCode === -1) await discardFfmpeg();
     return fallback.data;
   } catch (error) {
-    logProbeFallback(file, stage, startedAt, "error", { error });
     if (error instanceof LocalVideoDiagnosticError && error.exitCode === -1) await discardFfmpeg();
+    if (error instanceof LocalVideoDiagnosticError) throw error;
     throw originalError;
   }
 };
