@@ -12,10 +12,24 @@ type PropTypes = {
   IconComponent?: React.FC<React.SVGProps<SVGSVGElement>>;
 };
 
+const getFiniteNumber = (value: unknown, fallback = 0) => {
+  const parsedValue = typeof value === "number" ? value : Number(value);
+
+  return Number.isFinite(parsedValue) ? parsedValue : fallback;
+};
+
 const ResultIcon = React.forwardRef<SVGSVGElement, PropTypes>(
   ({ settings, size = 512, isPreview, IconComponent }, svgRef) => {
-    const strokeSize = isPreview ? 0 : settings.backgroundStrokeSize;
-    const strokeWidth = isNaN(parseInt(strokeSize.toString())) ? 0 : parseInt(strokeSize.toString());
+    const strokeSize = isPreview ? 0 : getFiniteNumber(settings.backgroundStrokeSize);
+    const strokeWidth = Math.max(0, Math.trunc(strokeSize));
+    const backgroundRadius = getFiniteNumber(settings.backgroundRadius);
+    const backgroundStrokeOpacity = getFiniteNumber(settings.backgroundStrokeOpacity);
+    const backgroundNoiseTextureOpacity = getFiniteNumber(settings.backgroundNoiseTextureOpacity);
+    const backgroundSpread = getFiniteNumber(settings.backgroundSpread);
+    const backgroundAngle = getFiniteNumber(settings.backgroundAngle);
+    const iconSize = getFiniteNumber(settings.iconSize);
+    const iconOffsetX = getFiniteNumber(settings.iconOffsetX);
+    const iconOffsetY = getFiniteNumber(settings.iconOffsetY);
 
     const rectId = useId().replace(/:/g, "");
     const gradientId = useId().replace(/:/g, "");
@@ -39,11 +53,11 @@ const ResultIcon = React.forwardRef<SVGSVGElement, PropTypes>(
           height={size - strokeSize}
           x={strokeSize / 2}
           y={strokeSize / 2}
-          rx={settings.backgroundRadius}
+          rx={backgroundRadius}
           fill={settings.backgroundFillType === "Solid" ? settings.backgroundStartColor : `url(#${gradientId})`}
           stroke={settings.backgroundStrokeColor}
           strokeWidth={strokeWidth}
-          strokeOpacity={`${settings.backgroundStrokeOpacity}%`}
+          strokeOpacity={`${backgroundStrokeOpacity}%`}
           paintOrder="stroke"
         />
 
@@ -54,7 +68,7 @@ const ResultIcon = React.forwardRef<SVGSVGElement, PropTypes>(
             x={strokeSize / 2}
             y={strokeSize / 2}
             fill={`url(#${radialGlareGradientId})`}
-            rx={settings.backgroundRadius}
+            rx={backgroundRadius}
             style={{ mixBlendMode: "overlay" }}
           />
         ) : null}
@@ -67,7 +81,7 @@ const ResultIcon = React.forwardRef<SVGSVGElement, PropTypes>(
             x={strokeSize / 2}
             y={strokeSize / 2}
             clipPath="url(#clip)"
-            opacity={`${settings.backgroundNoiseTextureOpacity}%`}
+            opacity={`${backgroundNoiseTextureOpacity}%`}
           />
         ) : null}
         <clipPath id="clip">
@@ -86,13 +100,13 @@ const ResultIcon = React.forwardRef<SVGSVGElement, PropTypes>(
               gradientUnits="objectBoundingBox"
             >
               <stop stopColor={settings.backgroundStartColor} />
-              <stop offset={settings.backgroundSpread / 100} stopColor={settings.backgroundEndColor} />
+              <stop offset={backgroundSpread / 100} stopColor={settings.backgroundEndColor} />
             </radialGradient>
           ) : (
             <linearGradient
               id={gradientId}
               gradientUnits="userSpaceOnUse"
-              gradientTransform={`rotate(${settings.backgroundAngle})`}
+              gradientTransform={`rotate(${backgroundAngle})`}
               style={{ transformOrigin: "center" }}
             >
               <stop stopColor={settings.backgroundStartColor} />
@@ -114,11 +128,11 @@ const ResultIcon = React.forwardRef<SVGSVGElement, PropTypes>(
 
         {IconComponent ? (
           <IconComponent
-            width={settings.iconSize}
-            height={settings.iconSize}
-            x={(size - settings.iconSize) / 2 + +settings.iconOffsetX}
-            y={(size - settings.iconSize) / 2 + +settings.iconOffsetY}
-            style={{ color: settings.iconColor, width: settings.iconSize, height: settings.iconSize }}
+            width={iconSize}
+            height={iconSize}
+            x={(size - iconSize) / 2 + iconOffsetX}
+            y={(size - iconSize) / 2 + iconOffsetY}
+            style={{ color: settings.iconColor, width: iconSize, height: iconSize }}
             alignmentBaseline="middle"
           />
         ) : null}

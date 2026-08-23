@@ -758,6 +758,16 @@
     display: inline-flex;
   }
 
+  .numberInputWrapper {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .numberInputLabel {
+    flex-grow: 2;
+    cursor: ew-resize;
+  }
+
   .selectWrapper {
     svg {
       position: absolute;
