@@ -325,8 +325,7 @@
   gap: 9px;
 }
 
-.checkerSwatch,
-.canvasTransparent {
+.checkerSwatch {
   background-color: #f8f8f8;
   background-image: linear-gradient(45deg, #d9d9d9 25%, transparent 25%),
     linear-gradient(-45deg, #d9d9d9 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d9d9d9 75%),
@@ -339,23 +338,39 @@
   background-size: 10px 10px;
 }
 
-.colorInputLabel {
-  display: inline-flex;
-  overflow: hidden;
-  width: 22px;
-  height: 22px;
-  border: 1px solid var(--gray-a5);
-  border-radius: 50%;
+.customColorControl {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  padding: 0 9px;
+  border: 1px solid var(--gray-a4);
+  border-radius: 7px;
+  background: var(--gray-a2);
+  color: hsl(var(--gray-10));
   cursor: pointer;
+  font-size: 11px;
+  gap: 8px;
 }
 
-.colorInputLabel input {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 0;
-  margin: -5px;
-  cursor: pointer;
+.customColorControl:hover,
+.customColorControl:focus-within {
+  border-color: var(--gray-a7);
+  color: hsl(var(--gray-12));
+  outline: none;
+}
+
+.customColorControl output {
+  margin-left: auto;
+  color: hsl(var(--gray-11));
+  font-variant-numeric: tabular-nums;
+}
+
+.customColorSwatch {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border: 1px solid var(--gray-a5);
+  border-radius: 4px;
 }
 
 .previewColumn {
@@ -379,6 +394,19 @@
   border-radius: 10px;
   background: #17181c;
   isolation: isolate;
+}
+
+.canvas.canvasTransparent {
+  background-color: #f8f8f8;
+  background-image: linear-gradient(45deg, #d9d9d9 25%, transparent 25%),
+    linear-gradient(-45deg, #d9d9d9 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d9d9d9 75%),
+    linear-gradient(-45deg, transparent 75%, #d9d9d9 75%);
+  background-position:
+    0 0,
+    0 5px,
+    5px -5px,
+    -5px 0;
+  background-size: 10px 10px;
 }
 
 .canvasLabel {

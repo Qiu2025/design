@@ -111,7 +111,7 @@ export function MockupMaker() {
   const [imagePositionY, setImagePositionY] = useState(0);
   const [frameScale, setFrameScale] = useState(getInitialFrameScale(DEFAULT_DEVICE));
   const [background, setBackground] = useState(BACKGROUND_PRESETS[0].value);
-  const [transparentBackground, setTransparentBackground] = useState(false);
+  const [transparentBackground, setTransparentBackground] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const [isReading, setIsReading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -468,16 +468,6 @@ export function MockupMaker() {
             <section className={styles.controlSection} aria-labelledby="background-title">
               <div className={styles.sectionHeading}>
                 <h2 id="background-title">Background</h2>
-                <label className={styles.colorInputLabel} aria-label="Custom background color">
-                  <input
-                    type="color"
-                    value={background}
-                    onChange={(event) => {
-                      setBackground(event.target.value);
-                      setTransparentBackground(false);
-                    }}
-                  />
-                </label>
               </div>
               <div className={styles.backgroundGrid}>
                 {BACKGROUND_PRESETS.map((preset) => (
@@ -509,6 +499,21 @@ export function MockupMaker() {
                   aria-pressed={transparentBackground}
                 />
               </div>
+              <label className={styles.customColorControl}>
+                <span className={styles.customColorSwatch} style={{ background }} aria-hidden="true" />
+                <span>Custom color</span>
+                <output>{background.toUpperCase()}</output>
+                <input
+                  type="color"
+                  value={background}
+                  onChange={(event) => {
+                    setBackground(event.target.value);
+                    setTransparentBackground(false);
+                  }}
+                  className={styles.visuallyHidden}
+                  aria-label="Custom background color"
+                />
+              </label>
               <label className={styles.rangeRow}>
                 <span>
                   Frame size
