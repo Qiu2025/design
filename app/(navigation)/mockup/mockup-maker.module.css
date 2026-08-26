@@ -726,10 +726,6 @@
   transition: transform 160ms ease;
 }
 
-.deviceFrame {
-  filter: drop-shadow(0 24px 30px rgb(0 0 0 / 0.3));
-}
-
 .deviceFrame:global(.mockframe) :global(.screen) {
   background-color: transparent;
 }
