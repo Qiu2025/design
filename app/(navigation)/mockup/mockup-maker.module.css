@@ -756,13 +756,22 @@
 
 .canvasHint {
   position: absolute;
-  right: 20px;
+  z-index: 1;
   bottom: 16px;
-  left: 20px;
+  left: 50%;
+  width: max-content;
+  max-width: calc(100% - 40px);
+  padding: 6px 10px;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: 6px;
   margin: 0;
-  color: hsl(var(--gray-9));
+  background: rgb(23 24 28 / 0.82);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.18);
+  color: #fff;
   font-size: 11px;
+  line-height: 1.4;
   text-align: center;
+  transform: translateX(-50%);
 }
 
 @media (max-width: 900px) {
