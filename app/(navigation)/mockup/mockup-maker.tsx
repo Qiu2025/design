@@ -148,6 +148,8 @@ type HsvColor = {
 type BackgroundMode = "solid" | "gradient";
 type ExportFormat = "png" | "svg";
 type ExportSize = (typeof EXPORT_SIZE_OPTIONS)[number];
+type ImageDimensions = { width: number; height: number };
+type ImageLayout = ImageDimensions & { maxOffsetX: number; maxOffsetY: number };
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -159,6 +161,29 @@ function isHexColor(value: string) {
 
 function isGradientBackground(value: string) {
   return value.includes("gradient(");
+}
+
+function getImageLayout(
+  image: ImageDimensions | null,
+  viewport: ImageDimensions | null,
+  fit: "contain" | "cover",
+  zoom: number,
+): ImageLayout | null {
+  if (!image || !viewport || !image.width || !image.height || !viewport.width || !viewport.height) return null;
+
+  const baseScale =
+    fit === "contain"
+      ? Math.min(viewport.width / image.width, viewport.height / image.height)
+      : Math.max(viewport.width / image.width, viewport.height / image.height);
+  const width = image.width * baseScale * zoom;
+  const height = image.height * baseScale * zoom;
+
+  return {
+    width,
+    height,
+    maxOffsetX: Math.abs(viewport.width - width) / 2,
+    maxOffsetY: Math.abs(viewport.height - height) / 2,
+  };
 }
 
 function addVisualOverflowPadding(node: HTMLElement) {
@@ -303,6 +328,9 @@ export function MockupMaker() {
   const [imageScale, setImageScale] = useState(1);
   const [imagePositionX, setImagePositionX] = useState(0);
   const [imagePositionY, setImagePositionY] = useState(0);
+  const [imageDimensions, setImageDimensions] = useState<ImageDimensions | null>(null);
+  const [screenDimensions, setScreenDimensions] = useState<ImageDimensions | null>(null);
+  const [isImageDragging, setIsImageDragging] = useState(false);
   const [frameScale, setFrameScale] = useState(getInitialFrameScale(DEFAULT_DEVICE));
   const [background, setBackground] = useState(BACKGROUND_PRESETS[0].value);
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>("solid");
@@ -324,6 +352,15 @@ export function MockupMaker() {
   const [canvasWidth, setCanvasWidth] = useState(0);
   const canvasRef = useRef<HTMLDivElement>(null);
   const frameCaptureRef = useRef<HTMLDivElement>(null);
+  const screenViewportRef = useRef<HTMLDivElement>(null);
+  const imageDragRef = useRef<{
+    offsetX: number;
+    offsetY: number;
+    pointerX: number;
+    pointerY: number;
+    scaleX: number;
+    scaleY: number;
+  } | null>(null);
   const customColorRef = useRef<HTMLDivElement>(null);
   const customColorPopoverRef = useRef<HTMLDivElement>(null);
   const customColorDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
@@ -339,12 +376,14 @@ export function MockupMaker() {
       ? `${DeviceOptions[selectedDevice].height} × ${DeviceOptions[selectedDevice].width}`
       : `${DeviceOptions[selectedDevice].width} × ${DeviceOptions[selectedDevice].height}`;
   const maxFrameScale = canvasWidth
-    ? Math.max(0.1, (canvasWidth - 32) / getFrameBaseWidth(selectedDevice, landscape))
+    ? Math.min(1, Math.max(0.1, (canvasWidth - 32) / getFrameBaseWidth(selectedDevice, landscape)))
     : 1;
-  const effectiveFrameScale = Math.min(frameScale, maxFrameScale);
+  const minFrameScale = Math.min(0.3, maxFrameScale);
+  const effectiveFrameScale = frameScale;
   const isCustomBackground =
     backgroundMode === "gradient" ||
     !BACKGROUND_PRESETS.some((preset) => preset.value.toLowerCase() === background.toLowerCase());
+  const imageLayout = getImageLayout(imageDimensions, screenDimensions, imageFit, imageScale);
 
   const activeGradientColor = activeGradientStop === "start" ? gradientStart : gradientEnd;
   const gradientBackground = `linear-gradient(${gradientAngle}deg, ${gradientStart} 0%, ${gradientEnd} 100%)`;
@@ -555,6 +594,29 @@ export function MockupMaker() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    const viewport = screenViewportRef.current;
+    if (!viewport || !imageUrl) {
+      setScreenDimensions(null);
+      return;
+    }
+
+    const updateScreenDimensions = () => {
+      setScreenDimensions({ width: viewport.clientWidth, height: viewport.clientHeight });
+    };
+    const observer = new ResizeObserver(updateScreenDimensions);
+    observer.observe(viewport);
+    updateScreenDimensions();
+
+    return () => observer.disconnect();
+  }, [imageUrl, landscape, selectedDevice]);
+
+  useEffect(() => {
+    if (!canvasWidth) return;
+
+    setFrameScale((value) => clamp(value, minFrameScale, maxFrameScale));
+  }, [canvasWidth, maxFrameScale, minFrameScale]);
+
   const loadImage = useCallback(async (file: File) => {
     if (!file.type.startsWith("image/")) {
       setError("Choose a PNG, JPG, WebP or another image file.");
@@ -571,6 +633,7 @@ export function MockupMaker() {
       setImageScale(1);
       setImagePositionX(0);
       setImagePositionY(0);
+      setImageDimensions(null);
     } catch {
       setError("The image could not be read. Try another file.");
     } finally {
@@ -692,7 +755,66 @@ export function MockupMaker() {
   const clearImage = () => {
     setImageUrl(null);
     setImageName(null);
+    setImageDimensions(null);
     setError(null);
+  };
+
+  const centerImage = () => {
+    setImagePositionX(0);
+    setImagePositionY(0);
+  };
+
+  const handleImagePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (!imageLayout) return;
+
+    const bounds = event.currentTarget.getBoundingClientRect();
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    imageDragRef.current = {
+      offsetX: imagePositionX,
+      offsetY: imagePositionY,
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+      scaleX: bounds.width / event.currentTarget.clientWidth || 1,
+      scaleY: bounds.height / event.currentTarget.clientHeight || 1,
+    };
+    setIsImageDragging(true);
+  };
+
+  const handleImagePointerMove = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = imageDragRef.current;
+    if (!drag || !event.currentTarget.hasPointerCapture(event.pointerId) || !imageLayout) return;
+
+    const deltaX = (event.clientX - drag.pointerX) / drag.scaleX;
+    const deltaY = (event.clientY - drag.pointerY) / drag.scaleY;
+    setImagePositionX(imageLayout.maxOffsetX ? clamp(drag.offsetX + deltaX / imageLayout.maxOffsetX, -1, 1) : 0);
+    setImagePositionY(imageLayout.maxOffsetY ? clamp(drag.offsetY + deltaY / imageLayout.maxOffsetY, -1, 1) : 0);
+  };
+
+  const handleImagePointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    imageDragRef.current = null;
+    setIsImageDragging(false);
+  };
+
+  const handleImagePositionKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    const step = event.shiftKey ? 0.1 : 0.05;
+
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      setImagePositionX((value) => (imageLayout?.maxOffsetX ? clamp(value - step, -1, 1) : 0));
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      setImagePositionX((value) => (imageLayout?.maxOffsetX ? clamp(value + step, -1, 1) : 0));
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setImagePositionY((value) => (imageLayout?.maxOffsetY ? clamp(value - step, -1, 1) : 0));
+    } else if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setImagePositionY((value) => (imageLayout?.maxOffsetY ? clamp(value + step, -1, 1) : 0));
+    }
   };
 
   const frameProps = {
@@ -703,19 +825,45 @@ export function MockupMaker() {
     className: styles.deviceFrame,
   } as MockFrameProps;
 
+  const imageOffsetX = imageLayout ? imagePositionX * imageLayout.maxOffsetX : 0;
+  const imageOffsetY = imageLayout ? imagePositionY * imageLayout.maxOffsetY : 0;
+
   const screenContent = imageUrl ? (
-    // Local data URLs are intentionally rendered without Next image optimization.
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={imageUrl}
-      alt={imageName ? `Preview of ${imageName}` : "Screenshot preview"}
-      className={styles.screenImage}
-      style={{
-        objectFit: imageFit,
-        objectPosition: "center",
-        transform: `translate(${imagePositionX}%, ${imagePositionY}%) scale(${imageScale})`,
-      }}
-    />
+    <div
+      ref={screenViewportRef}
+      className={cn(styles.screenImageViewport, isImageDragging && styles.screenImageDragging)}
+      role="group"
+      tabIndex={0}
+      aria-label="Screenshot position. Drag or use the arrow keys to reposition it."
+      onPointerDown={handleImagePointerDown}
+      onPointerMove={handleImagePointerMove}
+      onPointerUp={handleImagePointerUp}
+      onPointerCancel={handleImagePointerUp}
+      onKeyDown={handleImagePositionKeyDown}
+    >
+      {/* Local data URLs are intentionally rendered without Next image optimization. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={imageUrl}
+        alt={imageName ? `Preview of ${imageName}` : "Screenshot preview"}
+        draggable={false}
+        className={styles.screenImage}
+        onLoad={(event) => {
+          setImageDimensions({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight });
+        }}
+        style={
+          imageLayout
+            ? {
+                width: `${imageLayout.width}px`,
+                height: `${imageLayout.height}px`,
+                top: "50%",
+                left: "50%",
+                transform: `translate(-50%, -50%) translate(${imageOffsetX}px, ${imageOffsetY}px)`,
+              }
+            : { width: "100%", height: "100%", objectFit: imageFit }
+        }
+      />
+    </div>
   ) : (
     <div className={styles.screenPlaceholder}>
       <ImageIcon className="h-5 w-5" />
@@ -875,43 +1023,31 @@ export function MockupMaker() {
                     </div>
                     <label className={styles.rangeRow}>
                       <span>
-                        Image scale <output>{imageScale.toFixed(2)}×</output>
+                        Zoom <output>{imageScale.toFixed(2)}×</output>
                       </span>
                       <input
                         type="range"
-                        min="0.8"
+                        min="1"
                         max="2"
                         step="0.01"
                         value={imageScale}
                         onChange={(event) => setImageScale(Number(event.target.value))}
                       />
                     </label>
-                    <label className={styles.rangeRow}>
-                      <span>
-                        Horizontal position <output>{imagePositionX}%</output>
-                      </span>
-                      <input
-                        type="range"
-                        min="-40"
-                        max="40"
-                        step="1"
-                        value={imagePositionX}
-                        onChange={(event) => setImagePositionX(Number(event.target.value))}
-                      />
-                    </label>
-                    <label className={styles.rangeRow}>
-                      <span>
-                        Vertical position <output>{imagePositionY}%</output>
-                      </span>
-                      <input
-                        type="range"
-                        min="-40"
-                        max="40"
-                        step="1"
-                        value={imagePositionY}
-                        onChange={(event) => setImagePositionY(Number(event.target.value))}
-                      />
-                    </label>
+                    <div className={styles.positionRow}>
+                      <span className={styles.controlLabel}>Position</span>
+                      <button
+                        type="button"
+                        className={styles.resetPositionButton}
+                        onClick={centerImage}
+                        disabled={imagePositionX === 0 && imagePositionY === 0}
+                      >
+                        Center
+                      </button>
+                    </div>
+                    <p className={styles.positionHint}>
+                      Drag the screenshot to reposition it. Use the arrow keys for finer changes.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1248,14 +1384,12 @@ export function MockupMaker() {
               <label className={styles.rangeRow}>
                 <span>
                   Frame size
-                  <output>
-                    {Math.round(frameScale * 100)}%{effectiveFrameScale < frameScale ? " · fit" : ""}
-                  </output>
+                  <output>{Math.round(frameScale * 100)}%</output>
                 </span>
                 <input
                   type="range"
-                  min="0.3"
-                  max="0.85"
+                  min={minFrameScale}
+                  max={maxFrameScale}
                   step="0.01"
                   value={frameScale}
                   onChange={(event) => setFrameScale(Number(event.target.value))}

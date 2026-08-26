@@ -354,6 +354,44 @@
   cursor: pointer;
 }
 
+.positionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
+.resetPositionButton {
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--gray-a4);
+  border-radius: 7px;
+  background: var(--gray-a2);
+  color: hsl(var(--gray-11));
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+}
+
+.resetPositionButton:hover,
+.resetPositionButton:focus-visible {
+  border-color: var(--gray-a7);
+  color: hsl(var(--gray-12));
+  outline: none;
+}
+
+.resetPositionButton:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.positionHint {
+  margin: 6px 0 0;
+  color: hsl(var(--gray-9));
+  font-size: 10px;
+  line-height: 1.4;
+}
+
 .backgroundGrid {
   display: flex;
   flex-wrap: wrap;
@@ -774,11 +812,31 @@
   display: none;
 }
 
-.screenImage {
-  display: block;
+.screenImageViewport {
+  position: relative;
+  overflow: hidden;
   width: 100%;
   height: 100%;
-  transform-origin: center;
+  cursor: grab;
+  touch-action: none;
+}
+
+.screenImageViewport:focus-visible {
+  outline: 2px solid hsl(var(--brand));
+  outline-offset: -2px;
+}
+
+.screenImageDragging {
+  cursor: grabbing;
+}
+
+.screenImage {
+  position: absolute;
+  display: block;
+  max-width: none;
+  max-height: none;
+  pointer-events: none;
+  user-select: none;
 }
 
 .screenPlaceholder {
