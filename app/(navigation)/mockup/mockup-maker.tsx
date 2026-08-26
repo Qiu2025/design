@@ -617,8 +617,7 @@ export function MockupMaker() {
 
     const handleWheel = (event: WheelEvent) => {
       event.preventDefault();
-      const multiplier = event.deltaMode === WheelEvent.DOM_DELTA_PIXEL ? 0.001 : 0.1;
-      const zoomDelta = Math.min(Math.abs(event.deltaY) * multiplier, 0.1);
+      const zoomDelta = event.shiftKey ? 0.01 : 0.1;
       setImageScale((value) => clamp(value - Math.sign(event.deltaY) * zoomDelta, 1, 2));
     };
 
