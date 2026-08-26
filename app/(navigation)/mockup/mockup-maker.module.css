@@ -805,6 +805,12 @@
   background-color: transparent;
 }
 
+.deviceFrameDragging:global(.mockframe) :global(.screen),
+.deviceFrameDragging:global(.mockframe) :global(.overflow),
+.screenImageDragging {
+  overflow: visible !important;
+}
+
 .deviceFrame:global(.mockframe),
 .deviceFrame:global(.mockframe)::before,
 .deviceFrame:global(.mockframe)::after,
@@ -823,6 +829,7 @@
   overflow: hidden;
   width: 100%;
   height: 100%;
+  border-radius: inherit;
   cursor: grab;
   touch-action: none;
 }
@@ -831,11 +838,31 @@
   cursor: grabbing;
 }
 
+.screenImageClip {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
 .screenImage {
   position: absolute;
   display: block;
   max-width: none;
   max-height: none;
+  pointer-events: none;
+  user-select: none;
+}
+
+.screenImageGhost {
+  position: absolute;
+  z-index: 0;
+  display: block;
+  max-width: none;
+  max-height: none;
+  opacity: 0.25;
   pointer-events: none;
   user-select: none;
 }

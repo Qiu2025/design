@@ -17,6 +17,7 @@ import {
   useRef,
   useState,
   type ChangeEvent,
+  type CSSProperties,
   type DragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
@@ -827,11 +828,20 @@ export function MockupMaker() {
     ...(selectedColor ? { color: selectedColor } : {}),
     ...(supportsLandscape ? { landscape } : {}),
     hideNotch,
-    className: styles.deviceFrame,
+    className: cn(styles.deviceFrame, isImageDragging && styles.deviceFrameDragging),
   } as MockFrameProps;
 
   const imageOffsetX = imageLayout ? imagePositionX * imageLayout.maxOffsetX : 0;
   const imageOffsetY = imageLayout ? imagePositionY * imageLayout.maxOffsetY : 0;
+  const screenImageStyle: CSSProperties = imageLayout
+    ? {
+        width: `${imageLayout.width}px`,
+        height: `${imageLayout.height}px`,
+        top: "50%",
+        left: "50%",
+        transform: `translate(-50%, -50%) translate(${imageOffsetX}px, ${imageOffsetY}px)`,
+      }
+    : { width: "100%", height: "100%", objectFit: imageFit };
 
   const screenContent = imageUrl ? (
     <div
@@ -842,28 +852,31 @@ export function MockupMaker() {
       onPointerUp={handleImagePointerUp}
       onPointerCancel={handleImagePointerUp}
     >
-      {/* Local data URLs are intentionally rendered without Next image optimization. */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={imageUrl}
-        alt={imageName ? `Preview of ${imageName}` : "Screenshot preview"}
-        draggable={false}
-        className={styles.screenImage}
-        onLoad={(event) => {
-          setImageDimensions({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight });
-        }}
-        style={
-          imageLayout
-            ? {
-                width: `${imageLayout.width}px`,
-                height: `${imageLayout.height}px`,
-                top: "50%",
-                left: "50%",
-                transform: `translate(-50%, -50%) translate(${imageOffsetX}px, ${imageOffsetY}px)`,
-              }
-            : { width: "100%", height: "100%", objectFit: imageFit }
-        }
-      />
+      {isImageDragging && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={imageUrl}
+          alt=""
+          aria-hidden
+          draggable={false}
+          className={styles.screenImageGhost}
+          style={screenImageStyle}
+        />
+      )}
+      <div className={styles.screenImageClip}>
+        {/* Local data URLs are intentionally rendered without Next image optimization. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={imageUrl}
+          alt={imageName ? `Preview of ${imageName}` : "Screenshot preview"}
+          draggable={false}
+          className={styles.screenImage}
+          onLoad={(event) => {
+            setImageDimensions({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight });
+          }}
+          style={screenImageStyle}
+        />
+      </div>
     </div>
   ) : (
     <div className={styles.screenPlaceholder}>
