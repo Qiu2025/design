@@ -712,8 +712,8 @@ export function MockupMaker() {
       className={styles.screenImage}
       style={{
         objectFit: imageFit,
-        objectPosition: `${50 + imagePositionX}% ${50 + imagePositionY}%`,
-        transform: `scale(${imageScale})`,
+        objectPosition: "center",
+        transform: `translate(${imagePositionX}%, ${imagePositionY}%) scale(${imageScale})`,
       }}
     />
   ) : (
