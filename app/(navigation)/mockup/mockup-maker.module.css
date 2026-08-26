@@ -730,6 +730,19 @@
   background-color: transparent;
 }
 
+.deviceFrame:global(.mockframe),
+.deviceFrame:global(.mockframe)::before,
+.deviceFrame:global(.mockframe)::after,
+.deviceFrame:global(.mockframe) :global(*),
+.deviceFrame:global(.mockframe) :global(*)::before,
+.deviceFrame:global(.mockframe) :global(*)::after {
+  box-shadow: none !important;
+}
+
+.deviceFrame:global(.mockframe) :global(.shadow) {
+  display: none;
+}
+
 .screenImage {
   display: block;
   width: 100%;
