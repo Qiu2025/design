@@ -326,17 +326,8 @@
   gap: 6px;
 }
 
-.checkerSwatch {
-  background-color: #f8f8f8;
-  background-image: linear-gradient(45deg, #d9d9d9 25%, transparent 25%),
-    linear-gradient(-45deg, #d9d9d9 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d9d9d9 75%),
-    linear-gradient(-45deg, transparent 75%, #d9d9d9 75%);
-  background-position:
-    0 0,
-    0 5px,
-    5px -5px,
-    -5px 0;
-  background-size: 10px 10px;
+.backgroundControls {
+  margin-top: 12px;
 }
 
 .customColorTrigger {
@@ -672,7 +663,7 @@
   justify-content: center;
   border: 1px solid hsl(var(--gray-4));
   border-radius: 10px;
-  background: #17181c;
+  background: #000;
   background-clip: border-box;
   isolation: isolate;
 }
@@ -724,6 +715,11 @@
   justify-content: center;
   transform-origin: center;
   transition: transform 160ms ease;
+}
+
+.frameCapture {
+  display: inline-flex;
+  padding: 6px;
 }
 
 .deviceFrame:global(.mockframe) :global(.screen) {

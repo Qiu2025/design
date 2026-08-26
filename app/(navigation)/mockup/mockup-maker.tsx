@@ -29,7 +29,7 @@ const DEVICE_GROUPS: { label: string; devices: DeviceName[] }[] = [
 ];
 
 const BACKGROUND_PRESETS = [
-  { label: "Ink", value: "#17181c" },
+  { label: "Black", value: "#000000" },
   { label: "Cloud", value: "#e8e9ed" },
   { label: "Lilac", value: "#c9c2f7" },
   { label: "Peach", value: "#f2c5a5" },
@@ -199,7 +199,7 @@ export function MockupMaker() {
   const [gradientEnd, setGradientEnd] = useState(DEFAULT_GRADIENT_END);
   const [gradientAngle, setGradientAngle] = useState(135);
   const [activeGradientStop, setActiveGradientStop] = useState<"start" | "end">("start");
-  const [transparentBackground, setTransparentBackground] = useState(true);
+  const [exportDeviceOnly, setExportDeviceOnly] = useState(false);
   const [isCustomColorOpen, setIsCustomColorOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isReading, setIsReading] = useState(false);
@@ -208,6 +208,7 @@ export function MockupMaker() {
   const [isMounted, setIsMounted] = useState(false);
   const [canvasWidth, setCanvasWidth] = useState(0);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const frameCaptureRef = useRef<HTMLDivElement>(null);
   const customColorRef = useRef<HTMLDivElement>(null);
   const customColorPopoverRef = useRef<HTMLDivElement>(null);
   const customColorDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
@@ -226,9 +227,8 @@ export function MockupMaker() {
     : 1;
   const effectiveFrameScale = Math.min(frameScale, maxFrameScale);
   const isCustomBackground =
-    !transparentBackground &&
-    (backgroundMode === "gradient" ||
-      !BACKGROUND_PRESETS.some((preset) => preset.value.toLowerCase() === background.toLowerCase()));
+    backgroundMode === "gradient" ||
+    !BACKGROUND_PRESETS.some((preset) => preset.value.toLowerCase() === background.toLowerCase());
 
   const activeGradientColor = activeGradientStop === "start" ? gradientStart : gradientEnd;
   const gradientBackground = `linear-gradient(${gradientAngle}deg, ${gradientStart} 0%, ${gradientEnd} 100%)`;
@@ -237,13 +237,11 @@ export function MockupMaker() {
     setBackground(value);
     setBackgroundMode("solid");
     setCustomColorValue(value);
-    setTransparentBackground(false);
   };
 
   const updateGradient = (start: string, end: string, angle = gradientAngle) => {
     setBackground(`linear-gradient(${angle}deg, ${start} 0%, ${end} 100%)`);
     setBackgroundMode("gradient");
-    setTransparentBackground(false);
   };
 
   const activateGradient = () => {
@@ -268,6 +266,11 @@ export function MockupMaker() {
     else setGradientEnd(value);
     setCustomColorValue(value);
     updateGradient(start, end);
+  };
+
+  const handleExportModeChange = (deviceOnly: boolean) => {
+    setExportDeviceOnly(deviceOnly);
+    if (deviceOnly) setIsCustomColorOpen(false);
   };
 
   const handleCustomColorTextChange = (value: string) => {
@@ -497,16 +500,28 @@ export function MockupMaker() {
   };
 
   const handleExport = async () => {
-    if (!canvasRef.current || !imageUrl) return;
+    const deviceNode = frameCaptureRef.current;
+    const exportNode = exportDeviceOnly ? deviceNode : canvasRef.current;
+    if (!exportNode || !imageUrl || (exportDeviceOnly && !deviceNode)) return;
 
     setIsExporting(true);
     setError(null);
 
     try {
-      const dataUrl = await toPng(canvasRef.current, {
-        pixelRatio: 2,
-        style: { background: transparentBackground ? "transparent" : background },
-      });
+      const dataUrl = await toPng(
+        exportNode,
+        exportDeviceOnly
+          ? {
+              pixelRatio: 2,
+            }
+          : {
+              pixelRatio: 2,
+              style: {
+                backgroundColor: isGradientBackground(background) ? "transparent" : background,
+                backgroundImage: isGradientBackground(background) ? background : "none",
+              },
+            },
+      );
       const link = document.createElement("a");
       const baseName = imageName?.replace(/\.[^/.]+$/, "") || "mockup";
       link.download = `${baseName}-${selectedDevice.toLowerCase().replaceAll(" ", "-")}.png`;
@@ -758,256 +773,265 @@ export function MockupMaker() {
               <div className={styles.sectionHeading}>
                 <h2 id="background-title">Background</h2>
               </div>
-              <div className={styles.backgroundControls} ref={customColorRef}>
-                <div className={styles.backgroundGrid}>
-                  <button
-                    type="button"
-                    className={cn(
-                      styles.backgroundSwatch,
-                      styles.checkerSwatch,
-                      transparentBackground && styles.backgroundSwatchSelected,
-                    )}
-                    onClick={() => setTransparentBackground((value) => !value)}
-                    aria-label="Transparent background"
-                    aria-pressed={transparentBackground}
-                  />
-                  {BACKGROUND_PRESETS.map((preset) => (
+              <div className={styles.segmentedControl} role="group" aria-label="Export background">
+                <button
+                  type="button"
+                  className={cn(styles.segmentButton, !exportDeviceOnly && styles.segmentButtonActive)}
+                  onClick={() => handleExportModeChange(false)}
+                  aria-pressed={!exportDeviceOnly}
+                >
+                  With background
+                </button>
+                <button
+                  type="button"
+                  className={cn(styles.segmentButton, exportDeviceOnly && styles.segmentButtonActive)}
+                  onClick={() => handleExportModeChange(true)}
+                  aria-pressed={exportDeviceOnly}
+                >
+                  Device only
+                </button>
+              </div>
+              {!exportDeviceOnly && (
+                <div className={styles.backgroundControls} ref={customColorRef}>
+                  <div className={styles.backgroundGrid}>
+                    {BACKGROUND_PRESETS.map((preset) => (
+                      <button
+                        key={preset.value}
+                        type="button"
+                        className={cn(
+                          styles.backgroundSwatch,
+                          background === preset.value && styles.backgroundSwatchSelected,
+                        )}
+                        style={{ background: preset.value }}
+                        onClick={() => updateBackground(preset.value)}
+                        aria-label={preset.label}
+                        aria-pressed={background === preset.value}
+                      />
+                    ))}
                     <button
-                      key={preset.value}
                       type="button"
-                      className={cn(
-                        styles.backgroundSwatch,
-                        !transparentBackground && background === preset.value && styles.backgroundSwatchSelected,
-                      )}
-                      style={{ background: preset.value }}
-                      onClick={() => updateBackground(preset.value)}
-                      aria-label={preset.label}
-                      aria-pressed={!transparentBackground && background === preset.value}
-                    />
-                  ))}
-                  <button
-                    type="button"
-                    className={cn(styles.customColorTrigger, isCustomBackground && styles.customColorTriggerSelected)}
-                    onClick={handleColorPickerOpen}
-                    aria-expanded={isCustomColorOpen}
-                    aria-controls="custom-background-popover"
-                    aria-pressed={isCustomBackground}
-                  >
-                    <span>Custom</span>
-                    <span
-                      className={cn(
-                        styles.customColorTriggerIcon,
-                        isCustomBackground && styles.customColorTriggerSwatch,
-                      )}
-                      style={
-                        isCustomBackground
-                          ? { background: backgroundMode === "gradient" ? gradientBackground : background }
-                          : undefined
-                      }
-                      aria-hidden="true"
+                      className={cn(styles.customColorTrigger, isCustomBackground && styles.customColorTriggerSelected)}
+                      onClick={handleColorPickerOpen}
+                      aria-expanded={isCustomColorOpen}
+                      aria-controls="custom-background-popover"
+                      aria-pressed={isCustomBackground}
                     >
-                      {!isCustomBackground && "+"}
-                    </span>
-                  </button>
-                </div>
-                {isCustomColorOpen &&
-                  customColorPosition &&
-                  createPortal(
-                    <div
-                      ref={customColorPopoverRef}
-                      id="custom-background-popover"
-                      className={cn(
-                        styles.customColorPopover,
-                        isCustomColorDragging && styles.customColorPopoverDragging,
-                      )}
-                      role="dialog"
-                      aria-label="Custom background color"
-                      style={{ top: customColorPosition.top, left: customColorPosition.left }}
-                    >
-                      <div
-                        className={styles.customColorPopoverHeader}
-                        onPointerDown={handleCustomColorWindowPointerDown}
-                        onPointerMove={handleCustomColorWindowPointerMove}
-                        onPointerUp={handleCustomColorWindowPointerUp}
-                        onPointerCancel={handleCustomColorWindowPointerUp}
+                      <span>Custom</span>
+                      <span
+                        className={cn(
+                          styles.customColorTriggerIcon,
+                          isCustomBackground && styles.customColorTriggerSwatch,
+                        )}
+                        style={
+                          isCustomBackground
+                            ? { background: backgroundMode === "gradient" ? gradientBackground : background }
+                            : undefined
+                        }
+                        aria-hidden="true"
                       >
-                        <span>Custom background</span>
-                        <button
-                          type="button"
-                          className={styles.customColorClose}
-                          onClick={() => setIsCustomColorOpen(false)}
-                          aria-label="Close custom color"
+                        {!isCustomBackground && "+"}
+                      </span>
+                    </button>
+                  </div>
+                  {isCustomColorOpen &&
+                    customColorPosition &&
+                    createPortal(
+                      <div
+                        ref={customColorPopoverRef}
+                        id="custom-background-popover"
+                        className={cn(
+                          styles.customColorPopover,
+                          isCustomColorDragging && styles.customColorPopoverDragging,
+                        )}
+                        role="dialog"
+                        aria-label="Custom background color"
+                        style={{ top: customColorPosition.top, left: customColorPosition.left }}
+                      >
+                        <div
+                          className={styles.customColorPopoverHeader}
+                          onPointerDown={handleCustomColorWindowPointerDown}
+                          onPointerMove={handleCustomColorWindowPointerMove}
+                          onPointerUp={handleCustomColorWindowPointerUp}
+                          onPointerCancel={handleCustomColorWindowPointerUp}
                         >
-                          ×
-                        </button>
-                      </div>
-                      <div className={styles.customColorModes} role="tablist" aria-label="Background type">
-                        <button
-                          type="button"
-                          className={cn(
-                            styles.customColorMode,
-                            backgroundMode === "solid" && styles.customColorModeActive,
-                          )}
-                          onClick={activateSolid}
-                          role="tab"
-                          aria-selected={backgroundMode === "solid"}
-                        >
-                          Solid
-                        </button>
-                        <button
-                          type="button"
-                          className={cn(
-                            styles.customColorMode,
-                            backgroundMode === "gradient" && styles.customColorModeActive,
-                          )}
-                          onClick={activateGradient}
-                          role="tab"
-                          aria-selected={backgroundMode === "gradient"}
-                        >
-                          Gradient
-                        </button>
-                      </div>
-                      {backgroundMode === "gradient" && (
-                        <div className={styles.gradientOptions}>
-                          <div
-                            className={styles.gradientPreview}
-                            style={{ backgroundImage: gradientBackground }}
-                            aria-label="Gradient preview"
-                          />
-                          <div className={styles.gradientStops} aria-label="Gradient colors">
-                            <button
-                              type="button"
-                              className={cn(
-                                styles.gradientStop,
-                                activeGradientStop === "start" && styles.gradientStopActive,
-                              )}
-                              onClick={() => {
-                                setActiveGradientStop("start");
-                                setCustomColorValue(gradientStart);
-                                setColorPickerHsv(hexToHsv(gradientStart));
-                              }}
-                              aria-label="First gradient color"
-                              aria-pressed={activeGradientStop === "start"}
-                            >
-                              <span>Start</span>
-                              <span className={styles.gradientStopSwatch} style={{ background: gradientStart }} />
-                            </button>
-                            <span className={styles.gradientStopsArrow} aria-hidden="true">
-                              →
-                            </span>
-                            <button
-                              type="button"
-                              className={cn(
-                                styles.gradientStop,
-                                activeGradientStop === "end" && styles.gradientStopActive,
-                              )}
-                              onClick={() => {
-                                setActiveGradientStop("end");
-                                setCustomColorValue(gradientEnd);
-                                setColorPickerHsv(hexToHsv(gradientEnd));
-                              }}
-                              aria-label="Second gradient color"
-                              aria-pressed={activeGradientStop === "end"}
-                            >
-                              <span>End</span>
-                              <span className={styles.gradientStopSwatch} style={{ background: gradientEnd }} />
-                            </button>
+                          <span>Custom background</span>
+                          <button
+                            type="button"
+                            className={styles.customColorClose}
+                            onClick={() => setIsCustomColorOpen(false)}
+                            aria-label="Close custom color"
+                          >
+                            ×
+                          </button>
+                        </div>
+                        <div className={styles.customColorModes} role="tablist" aria-label="Background type">
+                          <button
+                            type="button"
+                            className={cn(
+                              styles.customColorMode,
+                              backgroundMode === "solid" && styles.customColorModeActive,
+                            )}
+                            onClick={activateSolid}
+                            role="tab"
+                            aria-selected={backgroundMode === "solid"}
+                          >
+                            Solid
+                          </button>
+                          <button
+                            type="button"
+                            className={cn(
+                              styles.customColorMode,
+                              backgroundMode === "gradient" && styles.customColorModeActive,
+                            )}
+                            onClick={activateGradient}
+                            role="tab"
+                            aria-selected={backgroundMode === "gradient"}
+                          >
+                            Gradient
+                          </button>
+                        </div>
+                        {backgroundMode === "gradient" && (
+                          <div className={styles.gradientOptions}>
+                            <div
+                              className={styles.gradientPreview}
+                              style={{ backgroundImage: gradientBackground }}
+                              aria-label="Gradient preview"
+                            />
+                            <div className={styles.gradientStops} aria-label="Gradient colors">
+                              <button
+                                type="button"
+                                className={cn(
+                                  styles.gradientStop,
+                                  activeGradientStop === "start" && styles.gradientStopActive,
+                                )}
+                                onClick={() => {
+                                  setActiveGradientStop("start");
+                                  setCustomColorValue(gradientStart);
+                                  setColorPickerHsv(hexToHsv(gradientStart));
+                                }}
+                                aria-label="First gradient color"
+                                aria-pressed={activeGradientStop === "start"}
+                              >
+                                <span>Start</span>
+                                <span className={styles.gradientStopSwatch} style={{ background: gradientStart }} />
+                              </button>
+                              <span className={styles.gradientStopsArrow} aria-hidden="true">
+                                →
+                              </span>
+                              <button
+                                type="button"
+                                className={cn(
+                                  styles.gradientStop,
+                                  activeGradientStop === "end" && styles.gradientStopActive,
+                                )}
+                                onClick={() => {
+                                  setActiveGradientStop("end");
+                                  setCustomColorValue(gradientEnd);
+                                  setColorPickerHsv(hexToHsv(gradientEnd));
+                                }}
+                                aria-label="Second gradient color"
+                                aria-pressed={activeGradientStop === "end"}
+                              >
+                                <span>End</span>
+                                <span className={styles.gradientStopSwatch} style={{ background: gradientEnd }} />
+                              </button>
+                            </div>
+                            <label className={styles.gradientAngle}>
+                              <span>
+                                Angle <output>{gradientAngle}°</output>
+                              </span>
+                              <input
+                                type="range"
+                                min="0"
+                                max="360"
+                                value={gradientAngle}
+                                onChange={(event) => {
+                                  const angle = Number(event.target.value);
+                                  setGradientAngle(angle);
+                                  updateGradient(gradientStart, gradientEnd, angle);
+                                }}
+                              />
+                            </label>
                           </div>
-                          <label className={styles.gradientAngle}>
-                            <span>
-                              Angle <output>{gradientAngle}°</output>
-                            </span>
+                        )}
+                        <div
+                          className={styles.customColorArea}
+                          role="slider"
+                          tabIndex={0}
+                          aria-label="Saturation and brightness"
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuenow={Math.round(colorPickerHsv.saturation * 100)}
+                          onPointerDown={(event) => {
+                            event.currentTarget.setPointerCapture(event.pointerId);
+                            updateSaturationAndValue(event);
+                          }}
+                          onPointerMove={(event) => {
+                            if (event.currentTarget.hasPointerCapture(event.pointerId)) updateSaturationAndValue(event);
+                          }}
+                          onKeyDown={handleSaturationAndValueKeyDown}
+                          style={{
+                            background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(${colorPickerHsv.hue} 100% 50%))`,
+                          }}
+                        >
+                          <span
+                            className={styles.customColorAreaCursor}
+                            style={{
+                              left: `${colorPickerHsv.saturation * 100}%`,
+                              top: `${(1 - colorPickerHsv.value) * 100}%`,
+                            }}
+                            aria-hidden="true"
+                          />
+                        </div>
+                        <div
+                          className={styles.customColorHue}
+                          role="slider"
+                          tabIndex={0}
+                          aria-label="Hue"
+                          aria-valuemin={0}
+                          aria-valuemax={360}
+                          aria-valuenow={Math.round(colorPickerHsv.hue)}
+                          onPointerDown={(event) => {
+                            event.currentTarget.setPointerCapture(event.pointerId);
+                            updateHue(event);
+                          }}
+                          onPointerMove={(event) => {
+                            if (event.currentTarget.hasPointerCapture(event.pointerId)) updateHue(event);
+                          }}
+                          onKeyDown={handleHueKeyDown}
+                        >
+                          <span
+                            className={styles.customColorHueCursor}
+                            style={{ left: `${(colorPickerHsv.hue / 360) * 100}%` }}
+                            aria-hidden="true"
+                          />
+                        </div>
+                        <div className={styles.customColorFields}>
+                          <span
+                            className={styles.customColorPreview}
+                            style={{ background: backgroundMode === "gradient" ? activeGradientColor : background }}
+                            aria-hidden="true"
+                          />
+                          <label className={styles.hexField}>
+                            <span>HEX</span>
                             <input
-                              type="range"
-                              min="0"
-                              max="360"
-                              value={gradientAngle}
-                              onChange={(event) => {
-                                const angle = Number(event.target.value);
-                                setGradientAngle(angle);
-                                updateGradient(gradientStart, gradientEnd, angle);
+                              type="text"
+                              value={customColorValue}
+                              maxLength={7}
+                              spellCheck={false}
+                              onChange={(event) => handleCustomColorTextChange(event.target.value)}
+                              onBlur={() => {
+                                if (!/^#[0-9a-f]{6}$/i.test(customColorValue)) setCustomColorValue(background);
                               }}
+                              aria-label="Hex color value"
                             />
                           </label>
                         </div>
-                      )}
-                      <div
-                        className={styles.customColorArea}
-                        role="slider"
-                        tabIndex={0}
-                        aria-label="Saturation and brightness"
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={Math.round(colorPickerHsv.saturation * 100)}
-                        onPointerDown={(event) => {
-                          event.currentTarget.setPointerCapture(event.pointerId);
-                          updateSaturationAndValue(event);
-                        }}
-                        onPointerMove={(event) => {
-                          if (event.currentTarget.hasPointerCapture(event.pointerId)) updateSaturationAndValue(event);
-                        }}
-                        onKeyDown={handleSaturationAndValueKeyDown}
-                        style={{
-                          background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(${colorPickerHsv.hue} 100% 50%))`,
-                        }}
-                      >
-                        <span
-                          className={styles.customColorAreaCursor}
-                          style={{
-                            left: `${colorPickerHsv.saturation * 100}%`,
-                            top: `${(1 - colorPickerHsv.value) * 100}%`,
-                          }}
-                          aria-hidden="true"
-                        />
-                      </div>
-                      <div
-                        className={styles.customColorHue}
-                        role="slider"
-                        tabIndex={0}
-                        aria-label="Hue"
-                        aria-valuemin={0}
-                        aria-valuemax={360}
-                        aria-valuenow={Math.round(colorPickerHsv.hue)}
-                        onPointerDown={(event) => {
-                          event.currentTarget.setPointerCapture(event.pointerId);
-                          updateHue(event);
-                        }}
-                        onPointerMove={(event) => {
-                          if (event.currentTarget.hasPointerCapture(event.pointerId)) updateHue(event);
-                        }}
-                        onKeyDown={handleHueKeyDown}
-                      >
-                        <span
-                          className={styles.customColorHueCursor}
-                          style={{ left: `${(colorPickerHsv.hue / 360) * 100}%` }}
-                          aria-hidden="true"
-                        />
-                      </div>
-                      <div className={styles.customColorFields}>
-                        <span
-                          className={styles.customColorPreview}
-                          style={{ background: backgroundMode === "gradient" ? activeGradientColor : background }}
-                          aria-hidden="true"
-                        />
-                        <label className={styles.hexField}>
-                          <span>HEX</span>
-                          <input
-                            type="text"
-                            value={customColorValue}
-                            maxLength={7}
-                            spellCheck={false}
-                            onChange={(event) => handleCustomColorTextChange(event.target.value)}
-                            onBlur={() => {
-                              if (!/^#[0-9a-f]{6}$/i.test(customColorValue)) setCustomColorValue(background);
-                            }}
-                            aria-label="Hex color value"
-                          />
-                        </label>
-                      </div>
-                    </div>,
-                    document.body,
-                  )}
-              </div>
+                      </div>,
+                      document.body,
+                    )}
+                </div>
+              )}
               <label className={styles.rangeRow}>
                 <span>
                   Frame size
@@ -1031,14 +1055,13 @@ export function MockupMaker() {
             <div className={styles.canvasLabel}>Preview</div>
             <div
               ref={canvasRef}
-              className={cn(styles.canvas, transparentBackground && styles.canvasTransparent)}
+              className={cn(styles.canvas, exportDeviceOnly && styles.canvasTransparent)}
               style={
-                transparentBackground
+                exportDeviceOnly
                   ? undefined
-                  : {
-                      backgroundColor: isGradientBackground(background) ? undefined : background,
-                      backgroundImage: isGradientBackground(background) ? background : undefined,
-                    }
+                  : isGradientBackground(background)
+                    ? { backgroundColor: "transparent", backgroundImage: background }
+                    : { backgroundColor: background, backgroundImage: "none" }
               }
             >
               <div className={styles.frameCenter}>
@@ -1046,7 +1069,9 @@ export function MockupMaker() {
                   className={styles.frameRenderer}
                   style={{ transform: `translate(-50%, -50%) scale(${effectiveFrameScale})` }}
                 >
-                  <MockFrame {...frameProps}>{screenContent}</MockFrame>
+                  <div ref={frameCaptureRef} className={styles.frameCapture}>
+                    <MockFrame {...frameProps}>{screenContent}</MockFrame>
+                  </div>
                 </div>
               </div>
               {!imageUrl && <p className={styles.canvasHint}>Upload a screenshot to start creating your mockup.</p>}
