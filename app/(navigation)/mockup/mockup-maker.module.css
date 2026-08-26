@@ -361,7 +361,13 @@
   margin-top: 14px;
 }
 
-.resetPositionButton {
+.zoomValue {
+  color: hsl(var(--gray-11));
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.resetViewButton {
   height: 26px;
   padding: 0 8px;
   border: 1px solid var(--gray-a4);
@@ -373,14 +379,14 @@
   font-size: 11px;
 }
 
-.resetPositionButton:hover,
-.resetPositionButton:focus-visible {
+.resetViewButton:hover,
+.resetViewButton:focus-visible {
   border-color: var(--gray-a7);
   color: hsl(var(--gray-12));
   outline: none;
 }
 
-.resetPositionButton:disabled {
+.resetViewButton:disabled {
   cursor: default;
   opacity: 0.45;
 }
@@ -819,11 +825,6 @@
   height: 100%;
   cursor: grab;
   touch-action: none;
-}
-
-.screenImageViewport:focus-visible {
-  outline: 2px solid hsl(var(--brand));
-  outline-offset: -2px;
 }
 
 .screenImageDragging {

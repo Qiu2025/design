@@ -779,6 +779,11 @@ export function MockupMaker() {
     setImagePositionY(0);
   };
 
+  const resetImageView = () => {
+    centerImage();
+    setImageScale(1);
+  };
+
   const handleImagePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
     if (!imageLayout) return;
 
@@ -814,24 +819,6 @@ export function MockupMaker() {
     setIsImageDragging(false);
   };
 
-  const handleImagePositionKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
-    const step = event.shiftKey ? 0.1 : 0.05;
-
-    if (event.key === "ArrowLeft") {
-      event.preventDefault();
-      setImagePositionX((value) => (imageLayout?.maxOffsetX ? clamp(value - step, -1, 1) : 0));
-    } else if (event.key === "ArrowRight") {
-      event.preventDefault();
-      setImagePositionX((value) => (imageLayout?.maxOffsetX ? clamp(value + step, -1, 1) : 0));
-    } else if (event.key === "ArrowUp") {
-      event.preventDefault();
-      setImagePositionY((value) => (imageLayout?.maxOffsetY ? clamp(value - step, -1, 1) : 0));
-    } else if (event.key === "ArrowDown") {
-      event.preventDefault();
-      setImagePositionY((value) => (imageLayout?.maxOffsetY ? clamp(value + step, -1, 1) : 0));
-    }
-  };
-
   const frameProps = {
     device: selectedDevice,
     ...(selectedColor ? { color: selectedColor } : {}),
@@ -847,14 +834,10 @@ export function MockupMaker() {
     <div
       ref={screenViewportRef}
       className={cn(styles.screenImageViewport, isImageDragging && styles.screenImageDragging)}
-      role="group"
-      tabIndex={0}
-      aria-label="Screenshot position. Drag or use the arrow keys to reposition it. Use the mouse wheel to zoom."
       onPointerDown={handleImagePointerDown}
       onPointerMove={handleImagePointerMove}
       onPointerUp={handleImagePointerUp}
       onPointerCancel={handleImagePointerUp}
-      onKeyDown={handleImagePositionKeyDown}
     >
       {/* Local data URLs are intentionally rendered without Next image optimization. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1036,33 +1019,22 @@ export function MockupMaker() {
                         </button>
                       ))}
                     </div>
-                    <label className={styles.rangeRow}>
-                      <span>
-                        Zoom <output>{imageScale.toFixed(2)}×</output>
-                      </span>
-                      <input
-                        type="range"
-                        min="1"
-                        max="2"
-                        step="0.01"
-                        value={imageScale}
-                        onChange={(event) => setImageScale(Number(event.target.value))}
-                      />
-                    </label>
+                    <div className={styles.positionRow}>
+                      <span className={styles.controlLabel}>Zoom</span>
+                      <output className={styles.zoomValue}>{imageScale.toFixed(2)}×</output>
+                    </div>
                     <div className={styles.positionRow}>
                       <span className={styles.controlLabel}>Position</span>
                       <button
                         type="button"
-                        className={styles.resetPositionButton}
-                        onClick={centerImage}
-                        disabled={imagePositionX === 0 && imagePositionY === 0}
+                        className={styles.resetViewButton}
+                        onClick={resetImageView}
+                        disabled={imagePositionX === 0 && imagePositionY === 0 && imageScale === 1}
                       >
-                        Center
+                        Reset view
                       </button>
                     </div>
-                    <p className={styles.positionHint}>
-                      Drag the screenshot to reposition it. Use the arrow keys for finer changes.
-                    </p>
+                    <p className={styles.positionHint}>Scroll to zoom · Drag to reposition</p>
                   </div>
                 </div>
               </div>
