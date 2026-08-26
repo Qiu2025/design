@@ -1,7 +1,15 @@
 "use client";
 
 import { MockFrame, DeviceOptions, type DeviceName, type MockFrameProps } from "react-mockframe";
-import { DownloadIcon, ImageIcon, RotateClockwiseIcon, TrashIcon } from "@raycast/icons";
+import {
+  ArrowsExpandIcon,
+  ChevronDownIcon,
+  CopyClipboardIcon,
+  DownloadIcon,
+  ImageIcon,
+  RotateClockwiseIcon,
+  TrashIcon,
+} from "@raycast/icons";
 import {
   useCallback,
   useEffect,
@@ -17,8 +25,25 @@ import { createPortal } from "react-dom";
 
 import { NavigationActions } from "@/components/navigation";
 import { Button } from "@/components/button";
+import { ButtonGroup } from "@/components/button-group";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/dropdown-menu";
+import { Kbd, Kbds } from "@/components/kbd";
 import { cn } from "@/utils/cn";
-import { toPng } from "../(code)/lib/image";
+import useHotkeys from "@/utils/useHotkeys";
+import { toPng, toSvg } from "../(code)/lib/image";
+import download from "../(code)/util/download";
+import usePngClipboardSupported from "../(code)/util/usePngClipboardSupported";
 
 import styles from "./mockup-maker.module.css";
 
@@ -38,6 +63,8 @@ const BACKGROUND_PRESETS = [
 
 const DEFAULT_GRADIENT_START = "#7c3aed";
 const DEFAULT_GRADIENT_END = "#f59e0b";
+const EXPORT_SIZE_OPTIONS = [2, 4, 6] as const;
+const SIZE_LABELS = { 2: "2x", 4: "4x", 6: "6x" } as const;
 
 const DEFAULT_DEVICE: DeviceName = "iPhone 17";
 
@@ -119,6 +146,8 @@ type HsvColor = {
 };
 
 type BackgroundMode = "solid" | "gradient";
+type ExportFormat = "png" | "svg";
+type ExportSize = (typeof EXPORT_SIZE_OPTIONS)[number];
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -193,7 +222,7 @@ async function cropTransparentPng(dataUrl: string) {
   return output.toDataURL("image/png");
 }
 
-async function exportDeviceFrame(node: HTMLElement) {
+async function renderDeviceFrame<T>(node: HTMLElement, render: (frame: HTMLElement) => Promise<T>) {
   const frame = node.cloneNode(true) as HTMLElement;
   const container = document.createElement("div");
   container.style.cssText = "position: fixed; top: 0; left: -10000px; width: max-content; pointer-events: none;";
@@ -202,10 +231,18 @@ async function exportDeviceFrame(node: HTMLElement) {
 
   try {
     addVisualOverflowPadding(frame);
-    return cropTransparentPng(await toPng(frame, { pixelRatio: 2 }));
+    return await render(frame);
   } finally {
     container.remove();
   }
+}
+
+async function exportDevicePng(node: HTMLElement, pixelRatio: ExportSize) {
+  return cropTransparentPng(await renderDeviceFrame(node, (frame) => toPng(frame, { pixelRatio })));
+}
+
+async function exportDeviceSvg(node: HTMLElement) {
+  return renderDeviceFrame(node, toSvg);
 }
 
 function hexToHsv(hex: string): HsvColor {
@@ -276,6 +313,8 @@ export function MockupMaker() {
   const [gradientAngle, setGradientAngle] = useState(135);
   const [activeGradientStop, setActiveGradientStop] = useState<"start" | "end">("start");
   const [exportDeviceOnly, setExportDeviceOnly] = useState(false);
+  const [exportSize, setExportSize] = useState<ExportSize>(2);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
   const [isCustomColorOpen, setIsCustomColorOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isReading, setIsReading] = useState(false);
@@ -291,6 +330,7 @@ export function MockupMaker() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [customColorPosition, setCustomColorPosition] = useState<{ top: number; left: number } | null>(null);
   const [isCustomColorDragging, setIsCustomColorDragging] = useState(false);
+  const pngClipboardSupported = usePngClipboardSupported();
 
   const colorOptions = useMemo(() => Array.from(DeviceOptions[selectedDevice].colors), [selectedDevice]);
   const supportsLandscape = DeviceOptions[selectedDevice].hasLandscape;
@@ -575,35 +615,79 @@ export function MockupMaker() {
     if (file) void loadImage(file);
   };
 
-  const handleExport = async () => {
+  const getMockupDataUrl = async (format: ExportFormat) => {
     const deviceNode = frameCaptureRef.current;
     const exportNode = exportDeviceOnly ? deviceNode : canvasRef.current;
-    if (!exportNode || !imageUrl) return;
+    if (!exportNode || !imageUrl) throw new Error("Couldn't find a mockup to export");
+
+    if (exportDeviceOnly) {
+      return format === "png" ? exportDevicePng(exportNode, exportSize) : exportDeviceSvg(exportNode);
+    }
+
+    const style = {
+      backgroundColor: isGradientBackground(background) ? "transparent" : background,
+      backgroundImage: isGradientBackground(background) ? background : "none",
+    };
+
+    return format === "png" ? toPng(exportNode, { pixelRatio: exportSize, style }) : toSvg(exportNode, { style });
+  };
+
+  const runExport = async (action: () => Promise<void>) => {
+    if (!imageUrl || isReading || isExporting) return;
 
     setIsExporting(true);
     setError(null);
 
     try {
-      const dataUrl = exportDeviceOnly
-        ? await exportDeviceFrame(exportNode)
-        : await toPng(exportNode, {
-            pixelRatio: 2,
-            style: {
-              backgroundColor: isGradientBackground(background) ? "transparent" : background,
-              backgroundImage: isGradientBackground(background) ? background : "none",
-            },
-          });
-      const link = document.createElement("a");
-      const baseName = imageName?.replace(/\.[^/.]+$/, "") || "mockup";
-      link.download = `${baseName}-${selectedDevice.toLowerCase().replaceAll(" ", "-")}.png`;
-      link.href = dataUrl;
-      link.click();
+      await action();
     } catch {
-      setError("The mockup could not be exported. Try again or use a smaller image.");
+      setError("The mockup could not be exported or copied. Try again or use a smaller image.");
     } finally {
       setIsExporting(false);
     }
   };
+
+  const getExportFileName = (format: ExportFormat) => {
+    const baseName = imageName?.replace(/\.[^/.]+$/, "") || "mockup";
+    return `${baseName}-${selectedDevice.toLowerCase().replaceAll(" ", "-")}.${format}`;
+  };
+
+  const savePng = () =>
+    runExport(async () => {
+      download(await getMockupDataUrl("png"), getExportFileName("png"));
+    });
+
+  const saveSvg = () =>
+    runExport(async () => {
+      download(await getMockupDataUrl("svg"), getExportFileName("svg"));
+    });
+
+  const copyMockup = () =>
+    runExport(async () => {
+      const blob = await fetch(await getMockupDataUrl("png")).then((response) => response.blob());
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    });
+
+  const dropdownHandler = (handler: () => Promise<void>) => (event: Event) => {
+    event.preventDefault();
+    void handler();
+    setDropdownOpen(false);
+  };
+
+  useHotkeys("ctrl+s,cmd+s", (event) => {
+    event.preventDefault();
+    void savePng();
+  });
+  useHotkeys("ctrl+c,cmd+c", (event) => {
+    if (pngClipboardSupported) {
+      event.preventDefault();
+      void copyMockup();
+    }
+  });
+  useHotkeys("ctrl+shift+s,cmd+shift+s", (event) => {
+    event.preventDefault();
+    void saveSvg();
+  });
 
   const clearImage = () => {
     setImageUrl(null);
@@ -643,15 +727,69 @@ export function MockupMaker() {
     <>
       <NavigationActions>
         {isMounted && (
-          <Button
-            variant="primary"
-            onClick={handleExport}
-            disabled={!imageUrl || isReading || isExporting}
-            aria-busy={isExporting}
-          >
-            <DownloadIcon className="h-4 w-4" />
-            {isExporting ? "Exporting" : "Download PNG"}
-          </Button>
+          <ButtonGroup>
+            <Button
+              variant="primary"
+              onClick={() => void savePng()}
+              disabled={!imageUrl || isReading || isExporting}
+              aria-busy={isExporting}
+            >
+              <DownloadIcon className="h-4 w-4" />
+              {isExporting ? "Exporting" : "Export Mockup"}
+            </Button>
+            <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="primary"
+                  disabled={!imageUrl || isReading || isExporting}
+                  aria-label="See other export options"
+                >
+                  <ChevronDownIcon className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="bottom" align="end">
+                <DropdownMenuItem onSelect={dropdownHandler(savePng)}>
+                  <ImageIcon /> Save PNG
+                  <Kbds>
+                    <Kbd>⌘</Kbd>
+                    <Kbd>S</Kbd>
+                  </Kbds>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={dropdownHandler(saveSvg)}>
+                  <ImageIcon /> Save SVG
+                  <Kbds>
+                    <Kbd>⌘</Kbd>
+                    <Kbd>⇧</Kbd>
+                    <Kbd>S</Kbd>
+                  </Kbds>
+                </DropdownMenuItem>
+                {pngClipboardSupported && (
+                  <DropdownMenuItem onSelect={dropdownHandler(copyMockup)}>
+                    <CopyClipboardIcon /> Copy Mockup
+                    <Kbds>
+                      <Kbd>⌘</Kbd>
+                      <Kbd>C</Kbd>
+                    </Kbds>
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger value={SIZE_LABELS[exportSize]}>
+                    <ArrowsExpandIcon /> Size
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent sideOffset={8}>
+                    <DropdownMenuRadioGroup value={exportSize.toString()}>
+                      {EXPORT_SIZE_OPTIONS.map((size) => (
+                        <DropdownMenuRadioItem key={size} value={size.toString()} onSelect={() => setExportSize(size)}>
+                          {SIZE_LABELS[size]}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </ButtonGroup>
         )}
       </NavigationActions>
 
