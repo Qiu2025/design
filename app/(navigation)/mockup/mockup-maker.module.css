@@ -145,6 +145,41 @@
   line-height: 1.4;
 }
 
+.imageControls {
+  display: grid;
+  margin-top: 0;
+  grid-template-rows: 0fr;
+  transition:
+    grid-template-rows 180ms ease,
+    margin-top 180ms ease;
+}
+
+.imageControlsVisible {
+  margin-top: 14px;
+  grid-template-rows: 1fr;
+}
+
+.imageControlsContent {
+  overflow: hidden;
+  min-height: 0;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity 140ms ease,
+    transform 180ms ease;
+}
+
+.imageControlsVisible .imageControlsContent {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 40ms;
+}
+
+.imageControlsBody {
+  padding-top: 14px;
+  border-top: 1px solid var(--gray-a3);
+}
+
 .iconButton {
   display: inline-flex;
   width: 26px;
@@ -777,6 +812,13 @@
   line-height: 1.4;
   text-align: center;
   transform: translateX(-50%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .imageControls,
+  .imageControlsContent {
+    transition: none;
+  }
 }
 
 @media (max-width: 900px) {

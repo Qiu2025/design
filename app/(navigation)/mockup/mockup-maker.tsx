@@ -853,6 +853,68 @@ export function MockupMaker() {
                   {error}
                 </p>
               )}
+              <div
+                className={cn(styles.imageControls, imageUrl && styles.imageControlsVisible)}
+                aria-hidden={!imageUrl}
+                inert={!imageUrl}
+              >
+                <div className={styles.imageControlsContent}>
+                  <div className={styles.imageControlsBody}>
+                    <div className={styles.segmentedControl} role="group" aria-label="Image fit">
+                      {(["contain", "cover"] as const).map((fit) => (
+                        <button
+                          key={fit}
+                          type="button"
+                          className={cn(styles.segmentButton, imageFit === fit && styles.segmentButtonActive)}
+                          onClick={() => setImageFit(fit)}
+                          aria-pressed={imageFit === fit}
+                        >
+                          {fit === "contain" ? "Fit" : "Fill"}
+                        </button>
+                      ))}
+                    </div>
+                    <label className={styles.rangeRow}>
+                      <span>
+                        Image scale <output>{imageScale.toFixed(2)}×</output>
+                      </span>
+                      <input
+                        type="range"
+                        min="0.8"
+                        max="2"
+                        step="0.01"
+                        value={imageScale}
+                        onChange={(event) => setImageScale(Number(event.target.value))}
+                      />
+                    </label>
+                    <label className={styles.rangeRow}>
+                      <span>
+                        Horizontal position <output>{imagePositionX}%</output>
+                      </span>
+                      <input
+                        type="range"
+                        min="-40"
+                        max="40"
+                        step="1"
+                        value={imagePositionX}
+                        onChange={(event) => setImagePositionX(Number(event.target.value))}
+                      />
+                    </label>
+                    <label className={styles.rangeRow}>
+                      <span>
+                        Vertical position <output>{imagePositionY}%</output>
+                      </span>
+                      <input
+                        type="range"
+                        min="-40"
+                        max="40"
+                        step="1"
+                        value={imagePositionY}
+                        onChange={(event) => setImagePositionY(Number(event.target.value))}
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
             </section>
 
             <section className={styles.controlSection} aria-labelledby="device-section-title">
@@ -918,64 +980,6 @@ export function MockupMaker() {
                   Hide notch / camera
                 </label>
               )}
-            </section>
-
-            <section className={styles.controlSection} aria-labelledby="image-controls-title">
-              <div className={styles.sectionHeading}>
-                <h2 id="image-controls-title">Image</h2>
-              </div>
-              <div className={styles.segmentedControl} role="group" aria-label="Image fit">
-                {(["contain", "cover"] as const).map((fit) => (
-                  <button
-                    key={fit}
-                    type="button"
-                    className={cn(styles.segmentButton, imageFit === fit && styles.segmentButtonActive)}
-                    onClick={() => setImageFit(fit)}
-                    aria-pressed={imageFit === fit}
-                  >
-                    {fit === "contain" ? "Fit" : "Fill"}
-                  </button>
-                ))}
-              </div>
-              <label className={styles.rangeRow}>
-                <span>
-                  Image scale <output>{imageScale.toFixed(2)}×</output>
-                </span>
-                <input
-                  type="range"
-                  min="0.8"
-                  max="2"
-                  step="0.01"
-                  value={imageScale}
-                  onChange={(event) => setImageScale(Number(event.target.value))}
-                />
-              </label>
-              <label className={styles.rangeRow}>
-                <span>
-                  Horizontal position <output>{imagePositionX}%</output>
-                </span>
-                <input
-                  type="range"
-                  min="-40"
-                  max="40"
-                  step="1"
-                  value={imagePositionX}
-                  onChange={(event) => setImagePositionX(Number(event.target.value))}
-                />
-              </label>
-              <label className={styles.rangeRow}>
-                <span>
-                  Vertical position <output>{imagePositionY}%</output>
-                </span>
-                <input
-                  type="range"
-                  min="-40"
-                  max="40"
-                  step="1"
-                  value={imagePositionY}
-                  onChange={(event) => setImagePositionY(Number(event.target.value))}
-                />
-              </label>
             </section>
 
             <section className={styles.controlSection} aria-labelledby="background-title">
