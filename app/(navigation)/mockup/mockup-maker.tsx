@@ -612,6 +612,21 @@ export function MockupMaker() {
   }, [imageUrl, landscape, selectedDevice]);
 
   useEffect(() => {
+    const viewport = screenViewportRef.current;
+    if (!viewport || !imageUrl) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const multiplier = event.deltaMode === WheelEvent.DOM_DELTA_PIXEL ? 0.001 : 0.1;
+      const zoomDelta = Math.min(Math.abs(event.deltaY) * multiplier, 0.1);
+      setImageScale((value) => clamp(value - Math.sign(event.deltaY) * zoomDelta, 1, 2));
+    };
+
+    viewport.addEventListener("wheel", handleWheel, { passive: false });
+    return () => viewport.removeEventListener("wheel", handleWheel);
+  }, [imageUrl]);
+
+  useEffect(() => {
     if (!canvasWidth) return;
 
     setFrameScale((value) => clamp(value, minFrameScale, maxFrameScale));
@@ -834,7 +849,7 @@ export function MockupMaker() {
       className={cn(styles.screenImageViewport, isImageDragging && styles.screenImageDragging)}
       role="group"
       tabIndex={0}
-      aria-label="Screenshot position. Drag or use the arrow keys to reposition it."
+      aria-label="Screenshot position. Drag or use the arrow keys to reposition it. Use the mouse wheel to zoom."
       onPointerDown={handleImagePointerDown}
       onPointerMove={handleImagePointerMove}
       onPointerUp={handleImagePointerUp}
