@@ -469,7 +469,7 @@ export function MockupMaker() {
     if (!drag || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
 
     const popoverWidth = 230;
-    const popoverHeight = 280;
+    const popoverHeight = customColorPopoverRef.current?.offsetHeight ?? 360;
     setCustomColorPosition({
       top: clamp(event.clientY - drag.offsetY, 12, Math.max(12, window.innerHeight - popoverHeight - 12)),
       left: clamp(event.clientX - drag.offsetX, 12, Math.max(12, window.innerWidth - popoverWidth - 12)),
@@ -567,7 +567,7 @@ export function MockupMaker() {
 
       const bounds = preview.getBoundingClientRect();
       const popoverWidth = 230;
-      const popoverHeight = 280;
+      const popoverHeight = customColorPopoverRef.current?.offsetHeight ?? 360;
       const inset = 16;
       setCustomColorPosition({
         top: clamp(bounds.top + inset, 12, Math.max(12, window.innerHeight - popoverHeight - 12)),
@@ -582,7 +582,7 @@ export function MockupMaker() {
       window.removeEventListener("resize", updateCustomColorPosition);
       document.removeEventListener("scroll", updateCustomColorPosition, true);
     };
-  }, [isCustomColorOpen]);
+  }, [backgroundMode, isCustomColorOpen]);
 
   useEffect(() => {
     if (!canvasRef.current) return;
@@ -1176,7 +1176,9 @@ export function MockupMaker() {
                         )}
                         style={
                           isCustomBackground
-                            ? { background: backgroundMode === "gradient" ? gradientBackground : background }
+                            ? backgroundMode === "gradient"
+                              ? { backgroundImage: gradientBackground }
+                              : { backgroundColor: background }
                             : undefined
                         }
                         aria-hidden="true"
@@ -1373,7 +1375,8 @@ export function MockupMaker() {
                               spellCheck={false}
                               onChange={(event) => handleCustomColorTextChange(event.target.value)}
                               onBlur={() => {
-                                if (!/^#[0-9a-f]{6}$/i.test(customColorValue)) setCustomColorValue(background);
+                                if (!/^#[0-9a-f]{6}$/i.test(customColorValue))
+                                  setCustomColorValue(backgroundMode === "gradient" ? activeGradientColor : background);
                               }}
                               aria-label="Hex color value"
                             />

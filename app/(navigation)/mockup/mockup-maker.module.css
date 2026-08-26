@@ -450,17 +450,21 @@
 
 .customColorTriggerSwatch {
   background: var(--gray-a3);
+  background-clip: padding-box;
 }
 
 .customColorPopover {
   position: fixed;
   z-index: 20;
   width: min(230px, 100%);
+  max-height: calc(100dvh - 24px);
+  box-sizing: border-box;
   padding: 10px;
   border: 1px solid var(--gray-a5);
   border-radius: 9px;
   background: hsl(var(--panel));
   box-shadow: 0 12px 28px rgb(0 0 0 / 0.32);
+  overflow-y: auto;
 }
 
 .customColorPopoverHeader {
@@ -540,7 +544,7 @@
   border: 1px solid var(--gray-a4);
   border-radius: 5px;
   margin-bottom: 8px;
-  background-clip: border-box;
+  background-clip: padding-box;
 }
 
 .gradientStops {
