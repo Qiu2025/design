@@ -132,6 +132,82 @@ function isGradientBackground(value: string) {
   return value.includes("gradient(");
 }
 
+function addVisualOverflowPadding(node: HTMLElement) {
+  const nodeBounds = node.getBoundingClientRect();
+  const visualBounds = Array.from(node.querySelectorAll<HTMLElement>("*")).reduce(
+    (bounds, child) => {
+      const childBounds = child.getBoundingClientRect();
+      return {
+        top: Math.min(bounds.top, childBounds.top),
+        right: Math.max(bounds.right, childBounds.right),
+        bottom: Math.max(bounds.bottom, childBounds.bottom),
+        left: Math.min(bounds.left, childBounds.left),
+      };
+    },
+    { top: nodeBounds.top, right: nodeBounds.right, bottom: nodeBounds.bottom, left: nodeBounds.left },
+  );
+  const styles = window.getComputedStyle(node);
+
+  // The extra pixel keeps subpixel-painted edges inside the export before transparent pixels are cropped.
+  node.style.padding = `${parseFloat(styles.paddingTop) + nodeBounds.top - visualBounds.top + 1}px ${
+    parseFloat(styles.paddingRight) + visualBounds.right - nodeBounds.right + 1
+  }px ${parseFloat(styles.paddingBottom) + visualBounds.bottom - nodeBounds.bottom + 1}px ${parseFloat(styles.paddingLeft) + nodeBounds.left - visualBounds.left + 1}px`;
+}
+
+async function cropTransparentPng(dataUrl: string) {
+  const image = new Image();
+  image.src = dataUrl;
+  await image.decode();
+
+  const source = document.createElement("canvas");
+  source.width = image.naturalWidth;
+  source.height = image.naturalHeight;
+  const sourceContext = source.getContext("2d");
+  if (!sourceContext) return dataUrl;
+
+  sourceContext.drawImage(image, 0, 0);
+  const { data, width, height } = sourceContext.getImageData(0, 0, source.width, source.height);
+  let top = height;
+  let right = 0;
+  let bottom = 0;
+  let left = width;
+
+  for (let pixel = 3; pixel < data.length; pixel += 4) {
+    if (data[pixel] === 0) continue;
+
+    const pixelIndex = (pixel - 3) / 4;
+    const x = pixelIndex % width;
+    const y = Math.floor(pixelIndex / width);
+    top = Math.min(top, y);
+    right = Math.max(right, x);
+    bottom = Math.max(bottom, y);
+    left = Math.min(left, x);
+  }
+
+  if (top > bottom || left > right) return dataUrl;
+
+  const output = document.createElement("canvas");
+  output.width = right - left + 1;
+  output.height = bottom - top + 1;
+  output.getContext("2d")?.drawImage(source, left, top, output.width, output.height, 0, 0, output.width, output.height);
+  return output.toDataURL("image/png");
+}
+
+async function exportDeviceFrame(node: HTMLElement) {
+  const frame = node.cloneNode(true) as HTMLElement;
+  const container = document.createElement("div");
+  container.style.cssText = "position: fixed; top: 0; left: -10000px; width: max-content; pointer-events: none;";
+  container.append(frame);
+  document.body.append(container);
+
+  try {
+    addVisualOverflowPadding(frame);
+    return cropTransparentPng(await toPng(frame, { pixelRatio: 2 }));
+  } finally {
+    container.remove();
+  }
+}
+
 function hexToHsv(hex: string): HsvColor {
   const value = Number.parseInt(hex.slice(1), 16);
   const red = ((value >> 16) & 255) / 255;
@@ -502,26 +578,21 @@ export function MockupMaker() {
   const handleExport = async () => {
     const deviceNode = frameCaptureRef.current;
     const exportNode = exportDeviceOnly ? deviceNode : canvasRef.current;
-    if (!exportNode || !imageUrl || (exportDeviceOnly && !deviceNode)) return;
+    if (!exportNode || !imageUrl) return;
 
     setIsExporting(true);
     setError(null);
 
     try {
-      const dataUrl = await toPng(
-        exportNode,
-        exportDeviceOnly
-          ? {
-              pixelRatio: 2,
-            }
-          : {
-              pixelRatio: 2,
-              style: {
-                backgroundColor: isGradientBackground(background) ? "transparent" : background,
-                backgroundImage: isGradientBackground(background) ? background : "none",
-              },
+      const dataUrl = exportDeviceOnly
+        ? await exportDeviceFrame(exportNode)
+        : await toPng(exportNode, {
+            pixelRatio: 2,
+            style: {
+              backgroundColor: isGradientBackground(background) ? "transparent" : background,
+              backgroundImage: isGradientBackground(background) ? background : "none",
             },
-      );
+          });
       const link = document.createElement("a");
       const baseName = imageName?.replace(/\.[^/.]+$/, "") || "mockup";
       link.download = `${baseName}-${selectedDevice.toLowerCase().replaceAll(" ", "-")}.png`;
