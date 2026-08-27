@@ -88,8 +88,8 @@ export function Navigation() {
                 className="h-8 min-w-0 w-full justify-between gap-2 rounded-full border border-gray-a3 bg-gray-a2/60 px-2.5 text-gray-12 shadow-[inset_0_1px_0_hsla(0,0%,100%,0.035)] hover:bg-gray-a3"
               >
                 <div className="flex min-w-0 items-center gap-2">
-                  <div className="flex h-5 w-5 shrink-0 items-center justify-center text-gray-12">
-                    <activeLink.icon className="h-4 w-4" />
+                  <div className="flex h-6 w-6 shrink-0 items-center justify-center text-gray-12">
+                    <activeLink.icon className="h-6 w-6" />
                   </div>
                   <span className="truncate text-sm font-medium">{activeLink.label}</span>
                 </div>
@@ -111,7 +111,7 @@ export function Navigation() {
                   >
                     <Link href={link.href} aria-current={isActive ? "page" : undefined}>
                       <div className="flex shrink-0 items-center justify-center text-gray-12">
-                        <link.icon className="h-5 w-5" />
+                        <link.icon className="h-9 w-9" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">

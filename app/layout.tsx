@@ -18,6 +18,9 @@ export const metadata = {
   metadataBase: new URL(BASE_URL),
   title: title,
   description: description,
+  icons: {
+    icon: [{ url: "/icon.svg?v=2", type: "image/svg+xml", sizes: "any" }],
+  },
   openGraph: {
     type: "website",
     siteName: "SnapBox",
