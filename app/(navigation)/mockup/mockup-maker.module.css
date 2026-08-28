@@ -736,22 +736,123 @@
   background: hsl(var(--gray-1));
 }
 
-.canvas {
+.canvasViewport {
   position: relative;
-  display: flex;
   overflow: hidden;
   min-height: 500px;
   flex: 1;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid hsl(var(--gray-4));
+}
+
+.canvasPreview {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform-origin: center;
+}
+
+.canvas {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  border: 1px solid transparent;
   border-radius: 10px;
   background: #000;
   background-clip: border-box;
   isolation: isolate;
 }
 
-.canvas.canvasTransparent {
+.canvasResizeHandles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.canvasResizeHandles::before {
+  position: absolute;
+  border: 1px solid hsl(var(--gray-5));
+  border-radius: 10px;
+  content: "";
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.canvasResizeHandle {
+  position: absolute;
+  z-index: 1;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+  pointer-events: auto;
+  transition: opacity 120ms ease;
+}
+
+.canvasResizeHandle::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+  content: "";
+  transform: translate(-50%, -50%);
+}
+
+.canvasPreview:hover .canvasResizeHandle,
+.canvasPreview:focus-within .canvasResizeHandle {
+  opacity: 1;
+}
+
+.canvasPreview:hover .canvasResizeHandles::before,
+.canvasPreview:focus-within .canvasResizeHandles::before {
+  opacity: 1;
+}
+
+.canvasResizeHandle:focus-visible {
+  outline: 2px solid hsl(var(--brand));
+  outline-offset: 2px;
+}
+
+.canvasResizeHandleTop,
+.canvasResizeHandleBottom {
+  left: 50%;
+  cursor: ns-resize;
+}
+
+.canvasResizeHandleLeft,
+.canvasResizeHandleRight {
+  top: 50%;
+  cursor: ew-resize;
+}
+
+.canvasResizeHandleTop {
+  top: 0;
+  transform: translate(-50%, -50%) scale(var(--handle-scale));
+}
+
+.canvasResizeHandleRight {
+  right: 0;
+  transform: translate(50%, -50%) scale(var(--handle-scale));
+}
+
+.canvasResizeHandleBottom {
+  bottom: 0;
+  transform: translate(-50%, 50%) scale(var(--handle-scale));
+}
+
+.canvasResizeHandleLeft {
+  left: 0;
+  transform: translate(-50%, -50%) scale(var(--handle-scale));
+}
+
+.canvasViewport.canvasTransparent {
   background-color: #f8f8f8;
   background-image: linear-gradient(45deg, #d9d9d9 25%, transparent 25%),
     linear-gradient(-45deg, #d9d9d9 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d9d9d9 75%),
@@ -884,24 +985,12 @@
   gap: 8px;
 }
 
-.canvasHint {
-  position: absolute;
-  z-index: 1;
-  bottom: 16px;
-  left: 50%;
-  width: max-content;
-  max-width: calc(100% - 40px);
-  padding: 6px 10px;
-  border: 1px solid rgb(255 255 255 / 0.14);
-  border-radius: 6px;
-  margin: 0;
-  background: rgb(23 24 28 / 0.82);
-  box-shadow: 0 4px 12px rgb(0 0 0 / 0.18);
-  color: #fff;
-  font-size: 11px;
-  line-height: 1.4;
+.screenPlaceholderHint {
+  max-width: 80%;
+  color: hsl(var(--gray-10));
+  font-size: 10px;
+  line-height: 1.35;
   text-align: center;
-  transform: translateX(-50%);
 }
 
 @media (prefers-reduced-motion: reduce) {

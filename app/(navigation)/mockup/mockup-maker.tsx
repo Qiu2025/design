@@ -13,6 +13,7 @@ import {
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -66,6 +67,10 @@ const DEFAULT_GRADIENT_START = "#7c3aed";
 const DEFAULT_GRADIENT_END = "#f59e0b";
 const EXPORT_SIZE_OPTIONS = [2, 4, 6] as const;
 const SIZE_LABELS = { 2: "2x", 4: "4x", 6: "6x" } as const;
+const DEFAULT_BACKGROUND_PADDING = { horizontal: 160, vertical: 160 };
+const MIN_BACKGROUND_PADDING = 24;
+const MIN_DEVICE_COVERAGE = 0.4;
+const PREVIEW_GUTTER = 24;
 
 const DEFAULT_DEVICE: DeviceName = "iPhone 17";
 
@@ -105,18 +110,6 @@ function getInitialColor(device: DeviceName) {
   return DEFAULT_DEVICE_COLORS[device] ?? colors[0];
 }
 
-function getInitialFrameScale(device: DeviceName) {
-  if (device.startsWith("MacBook")) return 0.56;
-  if (device.startsWith("iPad")) return 0.56;
-  return 0.58;
-}
-
-function getFrameBaseWidth(device: DeviceName, landscape: boolean) {
-  if (device.startsWith("MacBook")) return 1188;
-  if (device.startsWith("iPad")) return landscape ? 948 : 626;
-  return 480;
-}
-
 function readFileAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -151,9 +144,39 @@ type ExportFormat = "png" | "svg";
 type ExportSize = (typeof EXPORT_SIZE_OPTIONS)[number];
 type ImageDimensions = { width: number; height: number };
 type ImageLayout = ImageDimensions & { maxOffsetX: number; maxOffsetY: number };
+type FrameGeometry = ImageDimensions & { offsetX: number; offsetY: number };
+type BackgroundResizeDirection = { horizontal: -1 | 0 | 1; vertical: -1 | 0 | 1 };
+
+const BACKGROUND_RESIZE_HANDLES: { className: string; label: string; direction: BackgroundResizeDirection }[] = [
+  {
+    className: "canvasResizeHandleTop",
+    label: "Adjust vertical background space",
+    direction: { horizontal: 0, vertical: -1 },
+  },
+  {
+    className: "canvasResizeHandleRight",
+    label: "Adjust horizontal background space",
+    direction: { horizontal: 1, vertical: 0 },
+  },
+  {
+    className: "canvasResizeHandleBottom",
+    label: "Adjust vertical background space",
+    direction: { horizontal: 0, vertical: 1 },
+  },
+  {
+    className: "canvasResizeHandleLeft",
+    label: "Adjust horizontal background space",
+    direction: { horizontal: -1, vertical: 0 },
+  },
+];
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function getMaxBackgroundPadding(frameDimension: number | undefined) {
+  if (!frameDimension) return Infinity;
+  return Math.max(MIN_BACKGROUND_PADDING, (frameDimension * (1 - MIN_DEVICE_COVERAGE)) / (2 * MIN_DEVICE_COVERAGE));
 }
 
 function isHexColor(value: string) {
@@ -162,6 +185,28 @@ function isHexColor(value: string) {
 
 function isGradientBackground(value: string) {
   return value.includes("gradient(");
+}
+
+function getVisualBounds(node: HTMLElement) {
+  const nodeBounds = node.getBoundingClientRect();
+  return Array.from(node.querySelectorAll<HTMLElement>("*")).reduce(
+    (bounds, child) => {
+      const childBounds = child.getBoundingClientRect();
+      if (
+        (childBounds.width === 0 && childBounds.height === 0) ||
+        ![childBounds.top, childBounds.right, childBounds.bottom, childBounds.left].every(Number.isFinite)
+      )
+        return bounds;
+
+      return {
+        top: Math.min(bounds.top, childBounds.top),
+        right: Math.max(bounds.right, childBounds.right),
+        bottom: Math.max(bounds.bottom, childBounds.bottom),
+        left: Math.min(bounds.left, childBounds.left),
+      };
+    },
+    { top: nodeBounds.top, right: nodeBounds.right, bottom: nodeBounds.bottom, left: nodeBounds.left },
+  );
 }
 
 function getImageLayout(
@@ -189,18 +234,7 @@ function getImageLayout(
 
 function addVisualOverflowPadding(node: HTMLElement) {
   const nodeBounds = node.getBoundingClientRect();
-  const visualBounds = Array.from(node.querySelectorAll<HTMLElement>("*")).reduce(
-    (bounds, child) => {
-      const childBounds = child.getBoundingClientRect();
-      return {
-        top: Math.min(bounds.top, childBounds.top),
-        right: Math.max(bounds.right, childBounds.right),
-        bottom: Math.max(bounds.bottom, childBounds.bottom),
-        left: Math.min(bounds.left, childBounds.left),
-      };
-    },
-    { top: nodeBounds.top, right: nodeBounds.right, bottom: nodeBounds.bottom, left: nodeBounds.left },
-  );
+  const visualBounds = getVisualBounds(node);
   const styles = window.getComputedStyle(node);
 
   // The extra pixel keeps subpixel-painted edges inside the export before transparent pixels are cropped.
@@ -332,7 +366,10 @@ export function MockupMaker() {
   const [imageDimensions, setImageDimensions] = useState<ImageDimensions | null>(null);
   const [screenDimensions, setScreenDimensions] = useState<ImageDimensions | null>(null);
   const [isImageDragging, setIsImageDragging] = useState(false);
-  const [frameScale, setFrameScale] = useState(getInitialFrameScale(DEFAULT_DEVICE));
+  const [backgroundPadding, setBackgroundPadding] = useState(DEFAULT_BACKGROUND_PADDING);
+  const [frameGeometry, setFrameGeometry] = useState<FrameGeometry | null>(null);
+  const [frameNode, setFrameNode] = useState<HTMLDivElement | null>(null);
+  const [previewDimensions, setPreviewDimensions] = useState<ImageDimensions | null>(null);
   const [background, setBackground] = useState(BACKGROUND_PRESETS[0].value);
   const [backgroundMode, setBackgroundMode] = useState<BackgroundMode>("solid");
   const [customColorValue, setCustomColorValue] = useState(BACKGROUND_PRESETS[0].value);
@@ -350,8 +387,8 @@ export function MockupMaker() {
   const [isExporting, setIsExporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isMounted, setIsMounted] = useState(false);
-  const [canvasWidth, setCanvasWidth] = useState(0);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
   const frameCaptureRef = useRef<HTMLDivElement>(null);
   const screenViewportRef = useRef<HTMLDivElement>(null);
   const imageDragRef = useRef<{
@@ -361,6 +398,13 @@ export function MockupMaker() {
     pointerY: number;
     scaleX: number;
     scaleY: number;
+  } | null>(null);
+  const backgroundResizeRef = useRef<{
+    direction: BackgroundResizeDirection;
+    padding: typeof DEFAULT_BACKGROUND_PADDING;
+    pointerX: number;
+    pointerY: number;
+    previewScale: number;
   } | null>(null);
   const customColorRef = useRef<HTMLDivElement>(null);
   const customColorPopoverRef = useRef<HTMLDivElement>(null);
@@ -376,11 +420,33 @@ export function MockupMaker() {
     landscape && supportsLandscape
       ? `${DeviceOptions[selectedDevice].height} × ${DeviceOptions[selectedDevice].width}`
       : `${DeviceOptions[selectedDevice].width} × ${DeviceOptions[selectedDevice].height}`;
-  const maxFrameScale = canvasWidth
-    ? Math.min(1, Math.max(0.1, (canvasWidth - 32) / getFrameBaseWidth(selectedDevice, landscape)))
+  const maxBackgroundPaddingHorizontal = getMaxBackgroundPadding(frameGeometry?.width);
+  const maxBackgroundPaddingVertical = getMaxBackgroundPadding(frameGeometry?.height);
+  const backgroundCanvasSize = frameGeometry
+    ? {
+        width: Math.ceil(frameGeometry.width + backgroundPadding.horizontal * 2),
+        height: Math.ceil(frameGeometry.height + backgroundPadding.vertical * 2),
+      }
+    : { width: 720, height: 720 };
+  const deviceOnlyCanvasSize = frameGeometry
+    ? {
+        width: Math.ceil(frameGeometry.width + PREVIEW_GUTTER * 2),
+        height: Math.ceil(frameGeometry.height + PREVIEW_GUTTER * 2),
+      }
+    : { width: 720, height: 720 };
+  const canvasSize = exportDeviceOnly ? deviceOnlyCanvasSize : backgroundCanvasSize;
+  const previewScale = previewDimensions
+    ? Math.min(
+        1,
+        Math.max(
+          0.01,
+          Math.min(
+            (previewDimensions.width - PREVIEW_GUTTER * 2) / canvasSize.width,
+            (previewDimensions.height - PREVIEW_GUTTER * 2) / canvasSize.height,
+          ),
+        ),
+      )
     : 1;
-  const minFrameScale = Math.min(0.3, maxFrameScale);
-  const effectiveFrameScale = frameScale;
   const isCustomBackground =
     backgroundMode === "gradient" ||
     !BACKGROUND_PRESETS.some((preset) => preset.value.toLowerCase() === background.toLowerCase());
@@ -388,6 +454,11 @@ export function MockupMaker() {
 
   const activeGradientColor = activeGradientStop === "start" ? gradientStart : gradientEnd;
   const gradientBackground = `linear-gradient(${gradientAngle}deg, ${gradientStart} 0%, ${gradientEnd} 100%)`;
+  const previewBackgroundStyle: CSSProperties | undefined = exportDeviceOnly
+    ? undefined
+    : isGradientBackground(background)
+      ? { backgroundColor: "transparent", backgroundImage: background }
+      : { backgroundColor: background, backgroundImage: "none" };
 
   const updateBackground = (value: string) => {
     setBackground(value);
@@ -423,6 +494,11 @@ export function MockupMaker() {
     setCustomColorValue(value);
     updateGradient(start, end);
   };
+
+  const setFrameCapture = useCallback((node: HTMLDivElement | null) => {
+    frameCaptureRef.current = node;
+    setFrameNode(node);
+  }, []);
 
   const handleExportModeChange = (deviceOnly: boolean) => {
     setExportDeviceOnly(deviceOnly);
@@ -585,15 +661,62 @@ export function MockupMaker() {
   }, [backgroundMode, isCustomColorOpen]);
 
   useEffect(() => {
-    if (!canvasRef.current) return;
+    const preview = previewRef.current;
+    if (!preview) return;
 
-    const updateCanvasWidth = () => setCanvasWidth(canvasRef.current?.clientWidth ?? 0);
-    const observer = new ResizeObserver(updateCanvasWidth);
-    observer.observe(canvasRef.current);
-    updateCanvasWidth();
+    const updatePreviewDimensions = () => {
+      setPreviewDimensions({ width: preview.clientWidth, height: preview.clientHeight });
+    };
+    const observer = new ResizeObserver(updatePreviewDimensions);
+    observer.observe(preview);
+    updatePreviewDimensions();
 
     return () => observer.disconnect();
   }, []);
+
+  useLayoutEffect(() => {
+    const frame = frameNode;
+    if (!frame) return;
+
+    const updateFrameGeometry = () => {
+      const frameBounds = frame.getBoundingClientRect();
+      const visualBounds = getVisualBounds(frame);
+      const scale = frame.offsetWidth ? frameBounds.width / frame.offsetWidth : 1;
+      const nextGeometry = {
+        width: (visualBounds.right - visualBounds.left) / scale,
+        height: (visualBounds.bottom - visualBounds.top) / scale,
+        offsetX: (frameBounds.left + frameBounds.width / 2 - (visualBounds.left + visualBounds.right) / 2) / scale,
+        offsetY: (frameBounds.top + frameBounds.height / 2 - (visualBounds.top + visualBounds.bottom) / 2) / scale,
+      };
+
+      setFrameGeometry((value) =>
+        value &&
+        Object.entries(nextGeometry).every(
+          ([key, coordinate]) => Math.abs(value[key as keyof FrameGeometry] - coordinate) < 0.5,
+        )
+          ? value
+          : nextGeometry,
+      );
+    };
+
+    const observer = new ResizeObserver(updateFrameGeometry);
+    observer.observe(frame);
+    updateFrameGeometry();
+
+    return () => observer.disconnect();
+  }, [frameNode, hideNotch, landscape, selectedColor, selectedDevice]);
+
+  useEffect(() => {
+    setBackgroundPadding((padding) => {
+      const nextPadding = {
+        horizontal: clamp(padding.horizontal, MIN_BACKGROUND_PADDING, maxBackgroundPaddingHorizontal),
+        vertical: clamp(padding.vertical, MIN_BACKGROUND_PADDING, maxBackgroundPaddingVertical),
+      };
+      return padding.horizontal === nextPadding.horizontal && padding.vertical === nextPadding.vertical
+        ? padding
+        : nextPadding;
+    });
+  }, [maxBackgroundPaddingHorizontal, maxBackgroundPaddingVertical]);
 
   useEffect(() => {
     const viewport = screenViewportRef.current;
@@ -629,12 +752,6 @@ export function MockupMaker() {
     viewport.addEventListener("wheel", handleWheel, { passive: false });
     return () => viewport.removeEventListener("wheel", handleWheel);
   }, [imageUrl]);
-
-  useEffect(() => {
-    if (!canvasWidth) return;
-
-    setFrameScale((value) => clamp(value, minFrameScale, maxFrameScale));
-  }, [canvasWidth, maxFrameScale, minFrameScale]);
 
   const loadImage = useCallback(async (file: File) => {
     if (!file.type.startsWith("image/")) {
@@ -681,7 +798,75 @@ export function MockupMaker() {
     const nextDevice = event.target.value as DeviceName;
     setSelectedDevice(nextDevice);
     setSelectedColor(getInitialColor(nextDevice));
-    setFrameScale(getInitialFrameScale(nextDevice));
+  };
+
+  const handleBackgroundResizeStart = (
+    event: ReactPointerEvent<HTMLButtonElement>,
+    direction: BackgroundResizeDirection,
+  ) => {
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    backgroundResizeRef.current = {
+      direction,
+      padding: backgroundPadding,
+      pointerX: event.clientX,
+      pointerY: event.clientY,
+      previewScale,
+    };
+  };
+
+  const handleBackgroundResizeMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const resize = backgroundResizeRef.current;
+    if (!resize || !event.currentTarget.hasPointerCapture(event.pointerId)) return;
+
+    setBackgroundPadding({
+      horizontal: clamp(
+        resize.padding.horizontal +
+          (resize.direction.horizontal * (event.clientX - resize.pointerX)) / resize.previewScale,
+        MIN_BACKGROUND_PADDING,
+        maxBackgroundPaddingHorizontal,
+      ),
+      vertical: clamp(
+        resize.padding.vertical + (resize.direction.vertical * (event.clientY - resize.pointerY)) / resize.previewScale,
+        MIN_BACKGROUND_PADDING,
+        maxBackgroundPaddingVertical,
+      ),
+    });
+  };
+
+  const handleBackgroundResizeEnd = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.currentTarget.hasPointerCapture(event.pointerId))
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    backgroundResizeRef.current = null;
+  };
+
+  const handleBackgroundResizeKeyDown = (
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    direction: BackgroundResizeDirection,
+  ) => {
+    const step = event.shiftKey ? 32 : 8;
+    let horizontal = 0;
+    let vertical = 0;
+
+    if (direction.horizontal && event.key === "ArrowLeft") horizontal = -step;
+    else if (direction.horizontal && event.key === "ArrowRight") horizontal = step;
+    else if (direction.vertical && event.key === "ArrowUp") vertical = -step;
+    else if (direction.vertical && event.key === "ArrowDown") vertical = step;
+    else return;
+
+    event.preventDefault();
+    setBackgroundPadding((padding) => ({
+      horizontal: clamp(
+        padding.horizontal + direction.horizontal * horizontal,
+        MIN_BACKGROUND_PADDING,
+        maxBackgroundPaddingHorizontal,
+      ),
+      vertical: clamp(
+        padding.vertical + direction.vertical * vertical,
+        MIN_BACKGROUND_PADDING,
+        maxBackgroundPaddingVertical,
+      ),
+    }));
   };
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -882,6 +1067,7 @@ export function MockupMaker() {
     <div className={styles.screenPlaceholder}>
       <ImageIcon className="h-5 w-5" />
       <span>Your screenshot</span>
+      <span className={styles.screenPlaceholderHint}>Upload a screenshot to start creating your mockup.</span>
     </div>
   );
 
@@ -1385,49 +1571,65 @@ export function MockupMaker() {
                       </div>,
                       document.body,
                     )}
+                  <p className={styles.positionHint}>Drag the canvas edge to adjust background space.</p>
                 </div>
               )}
-              <label className={styles.rangeRow}>
-                <span>
-                  Frame size
-                  <output>{Math.round(frameScale * 100)}%</output>
-                </span>
-                <input
-                  type="range"
-                  min={minFrameScale}
-                  max={maxFrameScale}
-                  step="0.01"
-                  value={frameScale}
-                  onChange={(event) => setFrameScale(Number(event.target.value))}
-                />
-              </label>
             </section>
           </aside>
 
           <section className={styles.previewColumn} aria-label="Mockup preview">
             <div className={styles.canvasLabel}>Preview</div>
             <div
-              ref={canvasRef}
-              className={cn(styles.canvas, exportDeviceOnly && styles.canvasTransparent)}
-              style={
-                exportDeviceOnly
-                  ? undefined
-                  : isGradientBackground(background)
-                    ? { backgroundColor: "transparent", backgroundImage: background }
-                    : { backgroundColor: background, backgroundImage: "none" }
-              }
+              ref={previewRef}
+              className={cn(styles.canvasViewport, exportDeviceOnly && styles.canvasTransparent)}
+              style={previewBackgroundStyle}
+              aria-label={exportDeviceOnly ? "Device preview" : "Resizable mockup canvas"}
             >
-              <div className={styles.frameCenter}>
+              <div
+                className={styles.canvasPreview}
+                style={{
+                  width: `${canvasSize.width}px`,
+                  height: `${canvasSize.height}px`,
+                  transform: `translate(-50%, -50%) scale(${previewScale})`,
+                }}
+              >
                 <div
-                  className={styles.frameRenderer}
-                  style={{ transform: `translate(-50%, -50%) scale(${effectiveFrameScale})` }}
+                  ref={canvasRef}
+                  className={styles.canvas}
+                  style={{ backgroundColor: "transparent", backgroundImage: "none" }}
                 >
-                  <div ref={frameCaptureRef} className={styles.frameCapture}>
-                    <MockFrame {...frameProps}>{screenContent}</MockFrame>
+                  <div className={styles.frameCenter}>
+                    <div
+                      className={styles.frameRenderer}
+                      style={{
+                        transform: `translate(-50%, -50%) translate(${frameGeometry?.offsetX ?? 0}px, ${frameGeometry?.offsetY ?? 0}px)`,
+                      }}
+                    >
+                      <div ref={setFrameCapture} className={styles.frameCapture}>
+                        <MockFrame {...frameProps}>{screenContent}</MockFrame>
+                      </div>
+                    </div>
                   </div>
                 </div>
+                {!exportDeviceOnly && (
+                  <div className={styles.canvasResizeHandles} aria-label="Resize background canvas">
+                    {BACKGROUND_RESIZE_HANDLES.map((handle) => (
+                      <button
+                        key={handle.className}
+                        type="button"
+                        className={cn(styles.canvasResizeHandle, styles[handle.className])}
+                        style={{ "--handle-scale": 1 / previewScale } as CSSProperties}
+                        aria-label={handle.label}
+                        onPointerDown={(event) => handleBackgroundResizeStart(event, handle.direction)}
+                        onPointerMove={handleBackgroundResizeMove}
+                        onPointerUp={handleBackgroundResizeEnd}
+                        onPointerCancel={handleBackgroundResizeEnd}
+                        onKeyDown={(event) => handleBackgroundResizeKeyDown(event, handle.direction)}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
-              {!imageUrl && <p className={styles.canvasHint}>Upload a screenshot to start creating your mockup.</p>}
             </div>
           </section>
         </div>
