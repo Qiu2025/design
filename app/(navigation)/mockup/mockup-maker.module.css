@@ -756,7 +756,7 @@
   width: 100%;
   height: 100%;
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: var(--canvas-radius, 10px);
   background: #000;
   background-clip: border-box;
   isolation: isolate;
@@ -771,7 +771,7 @@
 .canvasResizeHandles::before {
   position: absolute;
   border: 1px solid hsl(var(--gray-5));
-  border-radius: 10px;
+  border-radius: var(--canvas-radius, 10px);
   content: "";
   inset: 0;
   opacity: 0;

@@ -71,6 +71,9 @@ const DEFAULT_BACKGROUND_PADDING = { horizontal: 160, vertical: 160 };
 const MIN_BACKGROUND_PADDING = 24;
 const MIN_DEVICE_COVERAGE = 0.4;
 const PREVIEW_GUTTER = 24;
+const CANVAS_CORNER_RADIUS_RATIO = 0.025;
+const MIN_CANVAS_CORNER_RADIUS = 12;
+const MAX_CANVAS_CORNER_RADIUS = 48;
 
 const DEFAULT_DEVICE: DeviceName = "iPhone 17";
 
@@ -435,6 +438,11 @@ export function MockupMaker() {
       }
     : { width: 720, height: 720 };
   const canvasSize = exportDeviceOnly ? deviceOnlyCanvasSize : backgroundCanvasSize;
+  const canvasCornerRadius = clamp(
+    Math.round(Math.max(canvasSize.width, canvasSize.height) * CANVAS_CORNER_RADIUS_RATIO),
+    MIN_CANVAS_CORNER_RADIUS,
+    MAX_CANVAS_CORNER_RADIUS,
+  );
   const previewScale = previewDimensions
     ? Math.min(
         1,
@@ -1587,16 +1595,23 @@ export function MockupMaker() {
             >
               <div
                 className={styles.canvasPreview}
-                style={{
-                  width: `${canvasSize.width}px`,
-                  height: `${canvasSize.height}px`,
-                  transform: `translate(-50%, -50%) scale(${previewScale})`,
-                }}
+                style={
+                  {
+                    width: `${canvasSize.width}px`,
+                    height: `${canvasSize.height}px`,
+                    transform: `translate(-50%, -50%) scale(${previewScale})`,
+                    "--canvas-radius": `${canvasCornerRadius}px`,
+                  } as CSSProperties
+                }
               >
                 <div
                   ref={canvasRef}
                   className={styles.canvas}
-                  style={{ backgroundColor: "transparent", backgroundImage: "none" }}
+                  style={{
+                    backgroundColor: "transparent",
+                    backgroundImage: "none",
+                    borderRadius: `${canvasCornerRadius}px`,
+                  }}
                 >
                   <div className={styles.frameCenter}>
                     <div
