@@ -47,6 +47,7 @@ import { toPng, toSvg } from "../(code)/lib/image";
 import download from "../(code)/util/download";
 import usePngClipboardSupported from "../(code)/util/usePngClipboardSupported";
 
+import { InfoDialog } from "./components/InfoDialog";
 import styles from "./mockup-maker.module.css";
 
 const DEVICE_GROUPS: { label: string; devices: DeviceName[] }[] = [
@@ -1082,6 +1083,7 @@ export function MockupMaker() {
   return (
     <>
       <NavigationActions>
+        <InfoDialog />
         {isMounted && (
           <ButtonGroup>
             <Button
