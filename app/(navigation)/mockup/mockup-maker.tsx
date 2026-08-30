@@ -71,7 +71,7 @@ const EXPORT_SIZE_OPTIONS = [2, 4, 6] as const;
 const SIZE_LABELS = { 2: "2x", 4: "4x", 6: "6x" } as const;
 const MIN_BACKGROUND_PADDING = 24;
 const DEFAULT_BACKGROUND_PADDING = { horizontal: MIN_BACKGROUND_PADDING, vertical: MIN_BACKGROUND_PADDING };
-const MIN_DEVICE_COVERAGE = 0.4;
+const MIN_DEVICE_COVERAGE = 0.3;
 const PREVIEW_GUTTER = 24;
 const CANVAS_CORNER_RADIUS_RATIO = 0.025;
 const MIN_CANVAS_CORNER_RADIUS = 12;
@@ -414,6 +414,7 @@ export function MockupMaker() {
   const customColorRef = useRef<HTMLDivElement>(null);
   const customColorPopoverRef = useRef<HTMLDivElement>(null);
   const customColorDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
+  const hasCustomizedBackgroundPadding = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [customColorPosition, setCustomColorPosition] = useState<{ top: number; left: number } | null>(null);
   const [isCustomColorDragging, setIsCustomColorDragging] = useState(false);
@@ -717,6 +718,31 @@ export function MockupMaker() {
   }, [frameNode, hideNotch, landscape, selectedColor, selectedDevice]);
 
   useEffect(() => {
+    if (hasCustomizedBackgroundPadding.current || !frameGeometry || !previewDimensions) return;
+
+    const availableWidth = Math.max(1, previewDimensions.width - PREVIEW_GUTTER * 2);
+    const availableHeight = Math.max(1, previewDimensions.height - PREVIEW_GUTTER * 2);
+    const deviceScale = Math.min(
+      1,
+      availableWidth / (frameGeometry.width + MIN_BACKGROUND_PADDING * 2),
+      availableHeight / (frameGeometry.height + MIN_BACKGROUND_PADDING * 2),
+    );
+
+    setBackgroundPadding({
+      horizontal: clamp(
+        (Math.floor(availableWidth / deviceScale) - frameGeometry.width) / 2,
+        MIN_BACKGROUND_PADDING,
+        maxBackgroundPaddingHorizontal,
+      ),
+      vertical: clamp(
+        (Math.floor(availableHeight / deviceScale) - frameGeometry.height) / 2,
+        MIN_BACKGROUND_PADDING,
+        maxBackgroundPaddingVertical,
+      ),
+    });
+  }, [frameGeometry, maxBackgroundPaddingHorizontal, maxBackgroundPaddingVertical, previewDimensions]);
+
+  useEffect(() => {
     setBackgroundPadding((padding) => {
       const nextPadding = {
         horizontal: clamp(padding.horizontal, MIN_BACKGROUND_PADDING, maxBackgroundPaddingHorizontal),
@@ -815,6 +841,7 @@ export function MockupMaker() {
     direction: BackgroundResizeDirection,
   ) => {
     event.preventDefault();
+    hasCustomizedBackgroundPadding.current = true;
     event.currentTarget.setPointerCapture(event.pointerId);
     backgroundResizeRef.current = {
       direction,
@@ -865,6 +892,7 @@ export function MockupMaker() {
     else return;
 
     event.preventDefault();
+    hasCustomizedBackgroundPadding.current = true;
     setBackgroundPadding((padding) => ({
       horizontal: clamp(
         padding.horizontal + direction.horizontal * horizontal,
