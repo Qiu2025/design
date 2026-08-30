@@ -732,7 +732,6 @@
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  padding: 16px;
   background: hsl(var(--gray-1));
 }
 
@@ -1034,7 +1033,6 @@
 
   .previewColumn {
     min-height: 460px;
-    padding: 10px;
   }
 
   .canvasLabel {
