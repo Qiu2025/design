@@ -57,8 +57,9 @@ const DEVICE_GROUPS: { label: string; devices: DeviceName[] }[] = [
 ];
 
 const BACKGROUND_PRESETS = [
-  { label: "Black", value: "#000000" },
-  { label: "Cloud", value: "#e8e9ed" },
+  { label: "Charcoal", value: "#18181b" },
+  { label: "Stone", value: "#d4cfc7" },
+  { label: "Ivory", value: "#f4f1ea" },
   { label: "Lilac", value: "#c9c2f7" },
   { label: "Peach", value: "#f2c5a5" },
   { label: "Mint", value: "#b8e5d1" },
