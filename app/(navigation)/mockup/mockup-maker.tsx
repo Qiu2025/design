@@ -7,6 +7,7 @@ import {
   CopyClipboardIcon,
   DownloadIcon,
   ImageIcon,
+  PlusIcon,
   RotateClockwiseIcon,
   TrashIcon,
 } from "@raycast/icons";
@@ -1412,7 +1413,7 @@ export function MockupMaker() {
                         }
                         aria-hidden="true"
                       >
-                        {!isCustomBackground && "+"}
+                        {!isCustomBackground && <PlusIcon className={styles.customColorPlusIcon} />}
                       </span>
                     </button>
                   </div>
