@@ -648,7 +648,7 @@ export function MockupMaker() {
     }
 
     const updateCustomColorPosition = () => {
-      const preview = canvasRef.current;
+      const preview = previewRef.current;
       if (!preview) return;
 
       const bounds = preview.getBoundingClientRect();
