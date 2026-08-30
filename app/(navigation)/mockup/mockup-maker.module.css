@@ -228,9 +228,10 @@
 .subControl,
 .optionRow {
   display: flex;
+  min-height: 28px;
   align-items: center;
   justify-content: space-between;
-  margin-top: 13px;
+  margin-top: 8px;
   gap: 10px;
 }
 
@@ -356,9 +357,10 @@
 
 .positionRow {
   display: flex;
+  min-height: 28px;
   align-items: center;
   justify-content: space-between;
-  margin-top: 14px;
+  margin-top: 8px;
 }
 
 .zoomValue {
@@ -392,21 +394,27 @@
 }
 
 .positionHint {
-  margin: 6px 0 0;
+  margin: 8px 0 0;
   color: hsl(var(--gray-9));
   font-size: 10px;
   line-height: 1.4;
+}
+
+.imageControlsBody .positionHint {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
 }
 
 .backgroundGrid {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
 }
 
 .backgroundControls {
-  margin-top: 12px;
+  margin-top: 14px;
 }
 
 .customColorTrigger {

@@ -1275,7 +1275,11 @@ export function MockupMaker() {
                         Reset view
                       </button>
                     </div>
-                    <p className={styles.positionHint}>Scroll: zoom · Shift: precise zoom · Drag: move</p>
+                    <p className={styles.positionHint}>
+                      Scroll to zoom or drag to reposition.
+                      <br />
+                      Hold Shift for finer control.
+                    </p>
                   </div>
                 </div>
               </div>
