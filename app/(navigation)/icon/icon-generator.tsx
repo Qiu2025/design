@@ -1173,7 +1173,7 @@ export const IconGenerator = () => {
         <div className={cn(styles.actions, styles.actionsLeft)}>
           <Button
             variant="transparent"
-            className={styles.undoButton}
+            className={cn(styles.undoButton, "h-8")}
             disabled={history.length <= 1}
             title="Ctrl+Z"
             onClick={undo}
@@ -1184,7 +1184,7 @@ export const IconGenerator = () => {
 
           <Button
             variant="transparent"
-            className={styles.redoButton}
+            className={cn(styles.redoButton, "h-8")}
             disabled={redoHistory.length === 0}
             title="Ctrl+Y"
             onClick={redo}
