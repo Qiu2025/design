@@ -38,16 +38,16 @@ const links = [
     icon: IconMakerIcon,
   },
   {
-    href: "/metadata",
-    label: "Metadata Remover",
-    description: "Remove metadata from images and videos",
-    icon: MetadataRemoverIcon,
-  },
-  {
     href: "/mockup",
     label: "Mockup Maker",
     description: "Create device mockups from screenshots",
     icon: MockupMakerIcon,
+  },
+  {
+    href: "/metadata",
+    label: "Metadata Remover",
+    description: "Remove metadata from images and videos",
+    icon: MetadataRemoverIcon,
   },
 ];
 
@@ -68,7 +68,7 @@ export function Navigation() {
 
   return (
     <nav className="flex items-center gap-3 h-[50px] pl-4 pr-5 bg-gray-2 text-white w-full fixed z-10">
-      <div className="relative flex items-center" style={{ width: NAVIGATION_WIDTH, minWidth: NAVIGATION_WIDTH }}>
+      <div className="relative flex items-center">
         <Button
           asChild
           className={cn(
@@ -80,23 +80,24 @@ export function Navigation() {
             <ChevronLeftIcon className="w-4 h-4 shrink-0" />
           </Link>
         </Button>
-        <div className="min-w-0 flex-1" style={{ paddingLeft: showBackButton ? 36 : 0 }}>
+        <div className="min-w-0" style={{ paddingLeft: showBackButton ? 36 : 0 }}>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="transparent"
-                className="h-8 min-w-0 w-full justify-between gap-2 rounded-full border border-gray-a3 bg-gray-a2/60 px-2.5 text-gray-12 shadow-[inset_0_1px_0_hsla(0,0%,100%,0.035)] hover:bg-gray-a3"
+                className="h-8 w-max justify-between gap-2 rounded-full border border-gray-a3 bg-gray-a2/60 px-2.5 text-gray-12 shadow-[inset_0_1px_0_hsla(0,0%,100%,0.035)] hover:bg-gray-a3"
+                style={{ minWidth: NAVIGATION_WIDTH }}
               >
                 <div className="flex min-w-0 items-center gap-2">
                   <div className="flex h-6 w-6 shrink-0 items-center justify-center text-gray-12">
                     <activeLink.icon className="h-6 w-6" />
                   </div>
-                  <span className="truncate text-sm font-medium">{activeLink.label}</span>
+                  <span className="whitespace-nowrap text-sm font-medium">{activeLink.label}</span>
                 </div>
                 <ChevronDownIcon className="h-4 w-4 shrink-0 text-gray-11" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-[min(20rem,calc(100vw-2rem))] rounded-xl p-2">
+            <DropdownMenuContent align="start" className="w-max max-w-[calc(100vw-2rem)] rounded-xl p-2">
               <DropdownMenuLabel className="px-2 pb-2 pt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-9">
                 Switch Tool
               </DropdownMenuLabel>
@@ -116,11 +117,9 @@ export function Navigation() {
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
                           <span className="truncate text-sm font-medium">{link.label}</span>
+                          {isActive && <CheckIcon className="h-4 w-4 shrink-0 text-gray-11" />}
                         </div>
                         <p className="truncate text-xs text-gray-10">{link.description}</p>
-                      </div>
-                      <div className="ml-2 flex w-4 justify-center text-gray-11">
-                        {isActive && <CheckIcon className="h-4 w-4" />}
                       </div>
                     </Link>
                   </DropdownMenuItem>
