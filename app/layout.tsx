@@ -11,8 +11,8 @@ import { Suspense } from "react";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500"], display: "swap" });
 
-const title = "SnapBox";
-const description = "SnapBox — Beautiful visual tools for code, icons & more.";
+const title = "Design";
+const description = "Design — Simple browser tools for creating and preparing digital assets.";
 
 export const metadata = {
   metadataBase: new URL(BASE_URL),
@@ -23,7 +23,7 @@ export const metadata = {
   },
   openGraph: {
     type: "website",
-    siteName: "SnapBox",
+    siteName: "Design",
   },
   twitter: {
     card: "summary_large_image",

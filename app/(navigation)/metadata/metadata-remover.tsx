@@ -53,7 +53,7 @@ import styles from "./metadata-remover.module.css";
 
 type ProcessingState = "idle" | "inspecting" | "uploading" | "processing" | "done" | "error";
 type PendingDownload = { blob: Blob; fileName: string };
-const SERVER_CONSENT_SESSION_KEY = "snapbox.metadata.server-consent";
+const SERVER_CONSENT_SESSION_KEY = "design.metadata.server-consent";
 
 const IMAGE_ACCEPT =
   ".jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.svg,image/jpeg,image/png,image/webp,image/gif,image/bmp,image/tiff,image/svg+xml";
@@ -440,7 +440,7 @@ export function MetadataRemover() {
 
     setPendingDownload(null);
     downloadBlob(result.blob, result.fileName);
-    setMessage("Verified: no selected fields remain among the metadata SnapBox can detect.");
+    setMessage("Verified: no selected fields remain among the metadata fields Design can detect.");
   };
 
   const cleanOnServer = async (selectedEntries: MetadataEntry[]) => {
@@ -583,8 +583,8 @@ export function MetadataRemover() {
           <DialogHeader>
             <DialogTitle>Upload this video?</DialogTitle>
             <DialogDescription>
-              SnapBox will temporarily upload it for server processing and attempt to remove its temporary files after
-              an error or when the response ends. This choice is remembered only for this browser session.
+              Design will temporarily upload it for server processing and attempt to remove its temporary files after an
+              error or when the response ends. This choice is remembered only for this browser session.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

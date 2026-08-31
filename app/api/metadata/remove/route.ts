@@ -256,7 +256,7 @@ export async function POST(request: Request) {
 
     if (errorCode === "unsupported_structure") {
       return NextResponse.json(
-        { error: "This video uses a program structure that SnapBox cannot preserve safely." },
+        { error: "This video uses a program structure that Design cannot preserve safely." },
         { status: 422 },
       );
     }

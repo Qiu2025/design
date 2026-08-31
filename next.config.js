@@ -83,32 +83,6 @@ const nextConfig = {
       ],
     };
   },
-  async redirects() {
-    return [
-      {
-        source: "/:path*",
-        has: [
-          {
-            type: "host",
-            value: "icon.snap.sqiu.dev",
-          },
-        ],
-        destination: "https://snap.sqiu.dev/icon/:path*",
-        permanent: true,
-      },
-      {
-        source: "/:path*",
-        has: [
-          {
-            type: "host",
-            value: "icons.snap.sqiu.dev",
-          },
-        ],
-        destination: "https://snap.sqiu.dev/icon/:path*",
-        permanent: true,
-      },
-    ];
-  },
   async headers() {
     return [
       {

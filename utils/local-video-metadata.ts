@@ -564,7 +564,7 @@ const probeVideo = async (file: File, stage: "probe" | "verify") => {
 const validateVideoProbe = (file: File, data: ProbeData, stage: "probe" | "verify") => {
   if ((data.programs || []).length > 0) {
     throw new LocalVideoDiagnosticError(
-      "This video uses a program structure that SnapBox cannot preserve safely.",
+      "This video uses a program structure that Design cannot preserve safely.",
       stage,
     );
   }

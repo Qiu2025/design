@@ -41,7 +41,7 @@ const ExportButton: React.FC = () => {
   const [, setFlashMessage] = useAtom(derivedFlashMessageAtom);
   const [, setFlashShown] = useAtom(flashShownAtom);
   const customFileName = useAtomValue(fileNameAtom);
-  const fileName = customFileName.replaceAll(" ", "-") || "snapbox-code";
+  const fileName = customFileName.replaceAll(" ", "-") || "design-code";
   const [exportSize, setExportSize] = useAtom(exportSizeAtom);
 
   const savePng = async () => {

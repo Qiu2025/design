@@ -16,9 +16,9 @@ const MAX_SELECTION_FIELD_BYTES = 256 * 1024;
 const MAX_UPLOAD_DURATION_MS = 180_000;
 const STALE_TEMPORARY_AGE_MS = 60 * 60 * 1000;
 const TEMPORARY_SWEEP_INTERVAL_MS = 10 * 60 * 1000;
-const TEMPORARY_DIRECTORY_PATTERN = /^snapbox-metadata-(inspect|remove)-[A-Za-z0-9]+$/;
+const TEMPORARY_DIRECTORY_PATTERN = /^(?:design|snapbox)-metadata-(inspect|remove)-[A-Za-z0-9]+$/;
 const LEGACY_TEMPORARY_DIRECTORIES = ["snapbox-metadata-inspect", "snapbox-metadata-remove"];
-const GLOBAL_STATE_KEY = "__snapboxMetadataServerRuntime";
+const GLOBAL_STATE_KEY = "__designMetadataServerRuntime";
 
 type RuntimeState = {
   activeJobs: number;
@@ -315,7 +315,7 @@ export const receiveServerMetadataUpload = async (
 
 export const createServerMetadataTemporaryDirectory = async (operation: "inspect" | "remove") => {
   await ensureTemporarySweep();
-  const directoryPath = await mkdtemp(join(tmpdir(), `snapbox-metadata-${operation}-`));
+  const directoryPath = await mkdtemp(join(tmpdir(), `design-metadata-${operation}-`));
   await chmod(directoryPath, 0o700);
   runtimeState.activeTemporaryDirectories.add(resolve(directoryPath));
   return directoryPath;

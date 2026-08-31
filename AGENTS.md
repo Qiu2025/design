@@ -2,7 +2,7 @@
 
 ## Project Structure & Module Organization
 
-SnapBox is a TypeScript Next.js App Router project. Feature routes live under `app/`: code images in `app/(navigation)/(code)/`, icons in `app/(navigation)/icon/`, metadata removal in `app/(navigation)/metadata/`, and server endpoints in `app/api/`. Reusable UI belongs in `components/`; cross-feature hooks and helpers belong in `utils/`. Keep feature-specific components, stores, styles, and assets beside their route. Static files served unchanged go in `public/`.
+Design is a TypeScript Next.js App Router project. Feature routes live under `app/`: code images in `app/(navigation)/(code)/`, icons in `app/(navigation)/icon/`, metadata removal in `app/(navigation)/metadata/`, and server endpoints in `app/api/`. Reusable UI belongs in `components/`; cross-feature hooks and helpers belong in `utils/`. Keep feature-specific components, stores, styles, and assets beside their route. Static files served unchanged go in `public/`.
 
 Use the configured aliases instead of long relative imports: `@/*` for the repository root, `@code/*` for the code-image feature, and `@icon/*` for the icon feature.
 

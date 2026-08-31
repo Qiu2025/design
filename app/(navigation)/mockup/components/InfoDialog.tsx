@@ -34,11 +34,11 @@ export function InfoDialog() {
               top-right corner.
             </p>
             <a
-              href="https://github.com/Qiu2025/snap-box"
+              href="https://github.com/Qiu2025/design"
               className="inline-flex w-fit items-center gap-2 text-gray-12 underline underline-offset-2"
             >
               <BrandGithubIcon className="h-4 w-4" />
-              github.com/Qiu2025/snap-box
+              github.com/Qiu2025/design
             </a>
           </div>
 

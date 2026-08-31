@@ -192,7 +192,7 @@ export const getLocalImageSupport = (file: File) => {
     return {
       supported: true,
       guaranteed: false,
-      reason: "SnapBox will only export this format if it can preserve its original behavior.",
+      reason: "Design will only export this format if it can preserve its original behavior.",
     };
   }
 

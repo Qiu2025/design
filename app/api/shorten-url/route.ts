@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-const SHORT_LINK_PUBLIC_DOMAIN = "snap.sqiu.dev";
+const SHORT_LINK_PUBLIC_DOMAIN = "design.sqiu.dev";
 
 const DEFAULT_SHLINK_BASE_URL = "https://go.sqiu.dev";
 

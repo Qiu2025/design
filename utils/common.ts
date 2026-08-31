@@ -14,7 +14,7 @@ const resolveBaseUrl = () => {
   }
 
   if (process.env.NEXT_PUBLIC_VERCEL_ENV === "production" || process.env.NODE_ENV === "production") {
-    return "https://snap.sqiu.dev";
+    return "https://design.sqiu.dev";
   }
 
   return "http://localhost:3000";

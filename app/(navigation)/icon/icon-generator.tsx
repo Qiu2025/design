@@ -1130,7 +1130,7 @@ export const IconGenerator = () => {
     try {
       const url = buildShareUrl();
       await navigator.share({
-        title: "SnapBox Icon",
+        title: "Design Icon",
         url,
       });
     } catch (err) {
@@ -1345,7 +1345,7 @@ export const IconGenerator = () => {
               <div className={styles.emptyIconsList}>
                 <BrushIcon className={styles.emptyIconsListIcon} />
                 We couldn’t find an icon for that
-                <Link href="https://github.com/Qiu2025/snap-box">
+                <Link href="https://github.com/Qiu2025/design">
                   Browse all icons <ArrowRightIcon />
                 </Link>
               </div>

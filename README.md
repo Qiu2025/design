@@ -1,13 +1,13 @@
 <h1 align="center">
-  SnapBox
+  Design
 </h1>
 <p align="center">
-  A compact toolbox for code images, icons, and private metadata cleaning.
+  Simple browser tools for creating and preparing digital assets.
 </p>
 
 ## About
 
-This repository contains the source code for [snap.sqiu.dev](https://snap.sqiu.dev), a collection of small browser tools. It includes:
+This repository contains the source code for [design.sqiu.dev](https://design.sqiu.dev), a collection of small browser tools. It includes:
 
 - [**Code Images**](</app/(navigation)/(code)>): Create beautiful images of your code.
 - [**Icon Maker**](</app/(navigation)/icon/>): Create beautiful icons for your apps and projects.

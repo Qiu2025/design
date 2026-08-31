@@ -27,7 +27,7 @@ export function InfoDialog() {
           <div className="flex flex-col gap-3 text-[13px] text-gray-11 leading-relaxed">
             <h3 className="font-medium text-gray-12">How it works</h3>
             <p>
-              SnapBox classifies the metadata it can detect. Safe cleaning selects fields classified as sensitive;
+              Design classifies the metadata it can detect. Safe cleaning selects fields classified as sensitive;
               Maximum selects every field not classified as protected. The classification is heuristic, and protected
               fields cannot be selected.
             </p>
@@ -36,16 +36,16 @@ export function InfoDialog() {
               filtered group switches the cleaning level to Custom.
             </p>
             <p>
-              After cleaning, SnapBox inspects the result again. A verified result means that none of the selected,
+              After cleaning, Design inspects the result again. A verified result means that none of the selected,
               listed fields were found and downloads automatically. If a selected field remains, the download pauses so
               you can review it first.
             </p>
             <a
-              href="https://github.com/Qiu2025/snap-box"
+              href="https://github.com/Qiu2025/design"
               className="inline-flex w-fit items-center gap-2 text-gray-12 underline underline-offset-2"
             >
               <BrandGithubIcon className="h-4 w-4" />
-              github.com/Qiu2025/snap-box
+              github.com/Qiu2025/design
             </a>
           </div>
           <div className="flex flex-col gap-3 text-[13px] text-gray-11 leading-relaxed">
@@ -62,7 +62,7 @@ export function InfoDialog() {
             </p>
             <p>
               Fields that appear necessary for display or playback are protected by a conservative classifier.
-              Verification covers only the selected tags listed by SnapBox; it does not prove that every
+              Verification covers only the selected tags listed by Design; it does not prove that every
               application-specific field or embedded payload was removed.
             </p>
             <p>
