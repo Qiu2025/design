@@ -25,6 +25,33 @@ npm run dev
 The server video fallback requires `ffmpeg` and `ffprobe`. When they are not on `PATH`, set `FFMPEG_PATH` and
 `FFPROBE_PATH`. The production Docker image installs both tools.
 
+URL shortening is optional and configured at runtime with `SHLINK_BASE_URL`, `SHLINK_API_KEY`, and optionally
+`SHLINK_SHORT_DOMAIN`. When `SHLINK_SHORT_DOMAIN` is omitted, the hostname from `SHLINK_BASE_URL` is used.
+
+With `docker run`:
+
+```bash
+docker run -p 4000:4000 \
+  -e SHLINK_BASE_URL=https://go.example.com \
+  -e SHLINK_SHORT_DOMAIN=go.example.com \
+  -e SHLINK_API_KEY=your-api-key \
+  your-image
+```
+
+Or with Docker Compose:
+
+```yaml
+services:
+  design:
+    image: your-image
+    ports:
+      - "4000:4000"
+    environment:
+      SHLINK_BASE_URL: https://go.example.com
+      SHLINK_SHORT_DOMAIN: go.example.com
+      SHLINK_API_KEY: ${SHLINK_API_KEY}
+```
+
 ## Credits
 
 This project is built on top of the open-source code from [ray.so](https://github.com/raycast/ray-so) by [Raycast](https://www.raycast.com/).

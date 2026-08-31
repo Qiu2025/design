@@ -73,16 +73,6 @@ const nextConfig = {
 
     return config;
   },
-  async rewrites() {
-    return {
-      fallback: [
-        {
-          source: "/:path*",
-          destination: "https://go.sqiu.dev/:path*",
-        },
-      ],
-    };
-  },
   async headers() {
     return [
       {

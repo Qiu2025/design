@@ -2,10 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-const SHORT_LINK_PUBLIC_DOMAIN = "design.sqiu.dev";
-
-const DEFAULT_SHLINK_BASE_URL = "https://go.sqiu.dev";
-
 const readEnv = (value: string | undefined) => {
   const trimmed = value?.trim();
 
@@ -24,8 +20,12 @@ const readEnv = (value: string | undefined) => {
 };
 
 const getShlinkConfig = () => {
-  const configured = readEnv(process.env.SHLINK_BASE_URL) || DEFAULT_SHLINK_BASE_URL;
+  const configured = readEnv(process.env.SHLINK_BASE_URL);
   const configuredShortDomain = readEnv(process.env.SHLINK_SHORT_DOMAIN);
+
+  if (!configured) {
+    throw new Error("SHLINK_BASE_URL is not configured");
+  }
 
   try {
     const parsed = new URL(configured);
@@ -34,32 +34,11 @@ const getShlinkConfig = () => {
       shlinkShortDomain: configuredShortDomain || parsed.hostname,
     };
   } catch {
-    return {
-      shlinkBaseUrl: DEFAULT_SHLINK_BASE_URL,
-      shlinkShortDomain: configuredShortDomain || new URL(DEFAULT_SHLINK_BASE_URL).hostname,
-    };
+    throw new Error("SHLINK_BASE_URL is invalid");
   }
 };
-
-const { shlinkBaseUrl, shlinkShortDomain } = getShlinkConfig();
 
 const getShlinkApiKey = () => readEnv(process.env.SHLINK_API_KEY);
-
-const getCanonicalAppOrigin = () => {
-  const configured = process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_SITE_URL;
-
-  if (configured) {
-    try {
-      return new URL(configured).origin;
-    } catch {
-      // Fallback to the public domain when env value is malformed.
-    }
-  }
-
-  return `https://${SHORT_LINK_PUBLIC_DOMAIN}`;
-};
-
-const canonicalAppOrigin = getCanonicalAppOrigin();
 
 const refs = ["codeImage", "icons", "desktopClient"] as const;
 
@@ -69,7 +48,7 @@ const isRef = (value: string | null): value is refProps => {
   return value !== null && refs.includes(value as refProps);
 };
 
-const requestShlinkShortUrl = async (payload: Record<string, unknown>, shlinkApiKey: string) => {
+const requestShlinkShortUrl = async (payload: Record<string, unknown>, shlinkApiKey: string, shlinkBaseUrl: string) => {
   const response = await fetch(`${shlinkBaseUrl}/rest/v3/short-urls`, {
     method: "POST",
     headers: {
@@ -95,6 +74,7 @@ const requestShlinkShortUrl = async (payload: Record<string, unknown>, shlinkApi
 };
 
 const createShortLink = async (destinationUrl: string, ref?: refProps) => {
+  const { shlinkBaseUrl, shlinkShortDomain } = getShlinkConfig();
   const shlinkApiKey = getShlinkApiKey();
 
   if (!shlinkApiKey) {
@@ -108,14 +88,14 @@ const createShortLink = async (destinationUrl: string, ref?: refProps) => {
   }
 
   try {
-    return await requestShlinkShortUrl({ ...payload, domain: shlinkShortDomain }, shlinkApiKey);
+    return await requestShlinkShortUrl({ ...payload, domain: shlinkShortDomain }, shlinkApiKey, shlinkBaseUrl);
   } catch (error) {
     // Some Shlink setups reject unknown domains; retry without forcing a specific one.
     console.warn("Shlink domain-specific shorten failed. Retrying without domain.", {
       shlinkShortDomain,
       error: error instanceof Error ? error.message : "Unknown error",
     });
-    return requestShlinkShortUrl(payload, shlinkApiKey);
+    return requestShlinkShortUrl(payload, shlinkApiKey, shlinkBaseUrl);
   }
 };
 
@@ -155,8 +135,7 @@ export async function GET(req: NextRequest) {
   const destinationUrl = normalizeDestinationUrl(url);
 
   if (
-    url.hostname.endsWith(SHORT_LINK_PUBLIC_DOMAIN) ||
-    url.hostname.endsWith(shlinkShortDomain) ||
+    url.hostname === req.nextUrl.hostname ||
     url.hostname === "localhost" ||
     url.hostname === "127.0.0.1" ||
     url.hostname === "[::1]" ||
@@ -167,8 +146,6 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ link: shortUrl });
     } catch (error) {
       console.error("Shlink shorten failed. Returning long URL fallback.", {
-        shlinkBaseUrl,
-        shlinkShortDomain,
         destinationUrl,
         ref,
         error: error instanceof Error ? error.message : "Unknown error",
