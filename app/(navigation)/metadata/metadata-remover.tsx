@@ -579,12 +579,12 @@ export function MetadataRemover() {
           else settleServerConsent(false);
         }}
       >
-        <DialogContent size="small">
+        <DialogContent size="medium">
           <DialogHeader>
             <DialogTitle>Upload this video?</DialogTitle>
             <DialogDescription>
-              Design will temporarily upload it for server processing and attempt to remove its temporary files after an
-              error or when the response ends. This choice is remembered only for this browser session.
+              The file will be temporarily uploaded for server processing and deleted afterward. This choice is
+              remembered only for this browser session.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

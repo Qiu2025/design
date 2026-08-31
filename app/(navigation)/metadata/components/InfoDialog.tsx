@@ -1,7 +1,7 @@
 import { Button } from "@/components/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/dialog";
 import useHotkeys from "@/utils/useHotkeys";
-import { BrandGithubIcon, Info02Icon } from "@raycast/icons";
+import { BrandGithubIcon, CheckCircleIcon, EraserIcon, Info02Icon, LockIcon } from "@raycast/icons";
 import { useCallback, useState } from "react";
 
 export function InfoDialog() {
@@ -18,28 +18,14 @@ export function InfoDialog() {
           <span className="hidden md:inline">About</span>
         </Button>
       </DialogTrigger>
-      <DialogContent size="large" className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
-        <div className="flex flex-col gap-2 pr-8">
-          <DialogTitle>About Metadata Remover</DialogTitle>
-          <DialogDescription>Inspect, choose and remove metadata from one image or video at a time.</DialogDescription>
-        </div>
-        <div className="grid gap-7 md:grid-cols-2">
+      <DialogContent size="large">
+        <div className="grid gap-8 md:grid-cols-2">
           <div className="flex flex-col gap-3 text-[13px] text-gray-11 leading-relaxed">
-            <h3 className="font-medium text-gray-12">How it works</h3>
-            <p>
-              Design classifies the metadata it can detect. Safe cleaning selects fields classified as sensitive;
-              Maximum selects every field not classified as protected. The classification is heuristic, and protected
-              fields cannot be selected.
-            </p>
-            <p>
-              Browse groups or search across field names, values and categories. Selecting individual fields or a
-              filtered group switches the cleaning level to Custom.
-            </p>
-            <p>
-              After cleaning, Design inspects the result again. A verified result means that none of the selected,
-              listed fields were found and downloads automatically. If a selected field remains, the download pauses so
-              you can review it first.
-            </p>
+            <DialogTitle>About</DialogTitle>
+            <DialogDescription className="text-[13px] text-gray-11 leading-relaxed">
+              Metadata Remover helps you find and remove hidden information from images and videos.
+            </DialogDescription>
+            <p>Add a file, review its metadata, choose what to remove, then download a cleaned copy.</p>
             <a
               href="https://github.com/Qiu2025/design"
               className="inline-flex w-fit items-center gap-2 text-gray-12 underline underline-offset-2"
@@ -48,29 +34,35 @@ export function InfoDialog() {
               github.com/Qiu2025/design
             </a>
           </div>
-          <div className="flex flex-col gap-3 text-[13px] text-gray-11 leading-relaxed">
-            <h3 className="font-medium text-gray-12">Privacy &amp; compatibility</h3>
-            <p>
-              Images are processed only in your browser. Videos use the local engine first; the optional server fallback
-              asks for explicit consent, accepts files up to 250 MB and attempts to remove its temporary files after an
-              error or when the response ends.
-            </p>
-            <p>
-              JPEG, PNG and WebP are the preferred local image formats. GIF, TIFF, BMP and SVG are best-effort formats:
-              the tool returns an output only when the local engine succeeds, but cannot guarantee every format-specific
-              behavior is unchanged. Local video support depends on the container and available browser memory.
-            </p>
-            <p>
-              Fields that appear necessary for display or playback are protected by a conservative classifier.
-              Verification covers only the selected tags listed by Design; it does not prove that every
-              application-specific field or embedded payload was removed.
-            </p>
-            <p>
-              With local processing, the selected file and result remain in your browser and are not uploaded. Server
-              processing temporarily uploads the video. Video cleaning remuxes without re-encoding and removes only the
-              file, track and chapter tags listed here. It preserves media, subtitle, attachment and data payloads,
-              codec side data and metadata embedded inside those payloads.
-            </p>
+          <div className="flex flex-col gap-3">
+            <h2 className="font-medium -mt-[3px]">Features</h2>
+            <div className="flex gap-3 rounded-md border border-gray-a3 bg-gray-a2/50 p-3">
+              <LockIcon className="mt-0.5 h-4 w-4 shrink-0 text-gray-11" />
+              <div className="flex flex-col gap-1">
+                <h3 className="text-[13px] font-medium text-gray-12">Private by default</h3>
+                <p className="text-[13px] text-gray-11 leading-relaxed">
+                  Images stay in your browser. Videos start locally and ask before server processing.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 rounded-md border border-gray-a3 bg-gray-a2/50 p-3">
+              <EraserIcon className="mt-0.5 h-4 w-4 shrink-0 text-gray-11" />
+              <div className="flex flex-col gap-1">
+                <h3 className="text-[13px] font-medium text-gray-12">Flexible cleaning</h3>
+                <p className="text-[13px] text-gray-11 leading-relaxed">
+                  Choose Safe, Maximum or the individual details you want to remove.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 rounded-md border border-gray-a3 bg-gray-a2/50 p-3">
+              <CheckCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-gray-11" />
+              <div className="flex flex-col gap-1">
+                <h3 className="text-[13px] font-medium text-gray-12">Verified results</h3>
+                <p className="text-[13px] text-gray-11 leading-relaxed">
+                  The cleaned file is checked again before it is downloaded.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </DialogContent>
