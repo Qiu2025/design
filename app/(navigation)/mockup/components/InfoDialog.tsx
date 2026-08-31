@@ -1,5 +1,5 @@
 import { Button } from "@/components/button";
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/dialog";
 import { Shortcut } from "@/components/kbd";
 import useHotkeys from "@/utils/useHotkeys";
 import { BrandGithubIcon, Info02Icon } from "@raycast/icons";
@@ -24,7 +24,9 @@ export function InfoDialog() {
         <div className="grid gap-8 md:grid-cols-2">
           <div className="flex flex-col gap-3 text-[13px] text-gray-11 leading-relaxed">
             <DialogTitle>About</DialogTitle>
-            <p>Mockup Maker is a tool to turn your screenshots into device mockups.</p>
+            <DialogDescription className="text-[13px] text-gray-11 leading-relaxed">
+              Mockup Maker is a tool to turn your screenshots into device mockups.
+            </DialogDescription>
             <p>
               Upload or paste a screenshot, choose a phone, tablet or laptop frame, and adjust the image to fit the
               screen.

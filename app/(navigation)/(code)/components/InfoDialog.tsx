@@ -1,5 +1,5 @@
 import { Button } from "@/components/button";
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/dialog";
 import { Shortcut } from "@/components/kbd";
 import useHotkeys from "@/utils/useHotkeys";
 import { BrandGithubIcon, Info02Icon } from "@raycast/icons";
@@ -24,7 +24,9 @@ export function InfoDialog() {
         <div className="grid gap-8 md:grid-cols-2">
           <div className="flex flex-col gap-3 text-[13px] text-gray-11 leading-relaxed">
             <DialogTitle>About</DialogTitle>
-            <p>Code Images is a tool to create beautiful screenshots of your code.</p>
+            <DialogDescription className="text-[13px] text-gray-11 leading-relaxed">
+              Code Images is a tool to create beautiful screenshots of your code.
+            </DialogDescription>
             <p>
               Pick a theme from a range of syntax colors and backgrounds, the language of your code and choose between
               light or dark mode.

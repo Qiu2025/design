@@ -1,5 +1,5 @@
 import { Button } from "@/components/button";
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/dialog";
 import { BrandGithubIcon, Info02Icon } from "@raycast/icons";
 import { Shortcut } from "@/components/kbd";
 import { useCallback, useState } from "react";
@@ -22,7 +22,9 @@ export function InfoDialog() {
         <div className="grid gap-8 md:grid-cols-2">
           <div className="flex flex-col gap-3 text-[13px] text-gray-11 leading-relaxed">
             <DialogTitle>About</DialogTitle>
-            <p>Icon Maker is a tool to easily create and export icons.</p>
+            <DialogDescription className="text-[13px] text-gray-11 leading-relaxed">
+              Icon Maker is a tool to easily create and export icons.
+            </DialogDescription>
             <p>
               Search for an icon or import your’s, change the color of the icon, and customize the background to create
               a beautifully simple icon.

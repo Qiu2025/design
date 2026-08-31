@@ -30,7 +30,7 @@ import {
   PlusCircleIcon,
 } from "@raycast/icons";
 import DesignLogo from "@/app/assets/design-logo.svg";
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/dialog";
 import { Kbd, Kbds, Shortcut } from "@/components/kbd";
 import { Input, InputSlot } from "@/components/input";
 import {
@@ -174,6 +174,7 @@ export default function Components() {
             </DialogTrigger>
             <DialogContent size="small">
               <DialogTitle>Keyboard Shortcuts</DialogTitle>
+              <DialogDescription className="sr-only">Available keyboard shortcuts.</DialogDescription>
               <div className="flex flex-col gap-3">
                 <Shortcut keys={["F"]}>Focus text editor</Shortcut>
                 <Shortcut keys={["Esc"]}>Unfocus text editor</Shortcut>
@@ -197,6 +198,7 @@ export default function Components() {
             </DialogTrigger>
             <DialogContent size="medium">
               <DialogTitle>Keyboard Shortcuts</DialogTitle>
+              <DialogDescription className="sr-only">Available keyboard shortcuts.</DialogDescription>
               <div className="flex flex-col gap-3">
                 <Shortcut keys={["F"]}>Focus text editor</Shortcut>
                 <Shortcut keys={["Esc"]}>Unfocus text editor</Shortcut>
@@ -220,6 +222,7 @@ export default function Components() {
             </DialogTrigger>
             <DialogContent size="large">
               <DialogTitle>Keyboard Shortcuts</DialogTitle>
+              <DialogDescription className="sr-only">Available keyboard shortcuts.</DialogDescription>
               <div className="flex flex-col gap-3">
                 <Shortcut keys={["F"]}>Focus text editor</Shortcut>
                 <Shortcut keys={["Esc"]}>Unfocus text editor</Shortcut>
