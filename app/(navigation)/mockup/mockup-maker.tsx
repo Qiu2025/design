@@ -716,7 +716,7 @@ export function MockupMaker() {
     updateFrameGeometry();
 
     return () => observer.disconnect();
-  }, [frameNode, hideNotch, landscape, selectedColor, selectedDevice]);
+  }, [frameNode, landscape, selectedColor, selectedDevice]);
 
   useEffect(() => {
     if (hasCustomizedBackgroundPadding.current || !frameGeometry || !previewDimensions) return;
