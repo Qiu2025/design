@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import cn from "classnames";
+import { cn } from "@/utils/cn";
 
 import { PlusIcon, TrashIcon } from "@raycast/icons";
 import { toPng as htmlToPng } from "html-to-image";

@@ -1,4 +1,4 @@
-import classNames from "classnames";
+import { cn } from "@/utils/cn";
 import React, { useEffect, useState } from "react";
 import { Language, LANGUAGES } from "../util/languages";
 
@@ -62,7 +62,7 @@ const HighlightedCode: React.FC<PropTypes> = ({ selectedLanguage, code }) => {
 
   return (
     <div
-      className={classNames(styles.formatted, selectedLanguage === LANGUAGES.plaintext && styles.plainText)}
+      className={cn(styles.formatted, selectedLanguage === LANGUAGES.plaintext && styles.plainText)}
       dangerouslySetInnerHTML={{
         __html: highlightedHtml,
       }}

@@ -45,19 +45,11 @@ const config: Config = {
           a12: "var(--gray-a12)",
         },
       },
-      screens: {
-        tall: { raw: "(min-height: 840px)" },
-        tallx2: { raw: "(min-height: 1000px)" },
-        desktop: { raw: "(min-height: 840px) and (min-width: 960px)" },
-      },
       spacing: {
         "scrollbar-offset": "calc(16px + var(--removed-body-scroll-bar-size, 0px))",
       },
       borderRadius: {
         inherit: "inherit",
-      },
-      fontSize: {
-        xxs: "11px",
       },
       keyframes: {
         slideDownAndFade: {
@@ -76,22 +68,12 @@ const config: Config = {
           from: { opacity: "0", transform: "translateX(-2px)" },
           to: { opacity: "1", transform: "translateX(0)" },
         },
-        overlayShow: {
-          from: { opacity: "0" },
-          to: { opacity: "1" },
-        },
-        contentShow: {
-          from: { opacity: "0", transform: "translateY(-1%) scale(0.98)" },
-          to: { opacity: "1", transform: "translateY(0%) scale(1)" },
-        },
       },
       animation: {
         slideDownAndFade: "slideDownAndFade 250ms cubic-bezier(0.16, 1, 0.3, 1)",
         slideLeftAndFade: "slideLeftAndFade 250ms cubic-bezier(0.16, 1, 0.3, 1)",
         slideUpAndFade: "slideUpAndFade 250ms cubic-bezier(0.16, 1, 0.3, 1)",
         slideRightAndFade: "slideRightAndFade 250ms cubic-bezier(0.16, 1, 0.3, 1)",
-        overlayShow: "overlayShow 150ms cubic-bezier(0.16, 1, 0.3, 1)",
-        contentShow: "contentShow 150ms cubic-bezier(0.16, 1, 0.3, 1)",
       },
       fontFamily: {
         sans: [

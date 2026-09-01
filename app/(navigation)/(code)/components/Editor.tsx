@@ -20,7 +20,7 @@ import {
 } from "../store/themes";
 import useHotkeys from "../../../../utils/useHotkeys";
 import HighlightedCode from "./HighlightedCode";
-import classNames from "classnames";
+import { cn } from "@/utils/cn";
 import { derivedFlashMessageAtom } from "../store/flash";
 import { highlightedLinesAtom, showLineNumbersAtom } from "../store";
 import { LANGUAGES } from "../util/languages";
@@ -253,7 +253,7 @@ function Editor() {
 
   return (
     <div
-      className={classNames(
+      className={cn(
         styles.editor,
         themeFont ? fontMap[themeFont] : styles.jetBrainsMono,
         isHighlightingLines && styles.isHighlightingLines,

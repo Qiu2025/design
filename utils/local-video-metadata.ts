@@ -748,5 +748,3 @@ export const cleanLocalVideo = async (
     }
   });
 };
-
-export const disposeLocalVideoEngine = discardFfmpeg;

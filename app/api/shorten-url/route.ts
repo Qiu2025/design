@@ -38,14 +38,12 @@ const getShlinkConfig = () => {
   }
 };
 
-const getShlinkApiKey = () => readEnv(process.env.SHLINK_API_KEY);
-
 const refs = ["codeImage", "icons", "desktopClient"] as const;
 
-export type refProps = (typeof refs)[number];
+type Ref = (typeof refs)[number];
 
-const isRef = (value: string | null): value is refProps => {
-  return value !== null && refs.includes(value as refProps);
+const isRef = (value: string | null): value is Ref => {
+  return value !== null && refs.includes(value as Ref);
 };
 
 const requestShlinkShortUrl = async (payload: Record<string, unknown>, shlinkApiKey: string, shlinkBaseUrl: string) => {
@@ -73,9 +71,9 @@ const requestShlinkShortUrl = async (payload: Record<string, unknown>, shlinkApi
   return data.shortUrl;
 };
 
-const createShortLink = async (destinationUrl: string, ref?: refProps) => {
+const createShortLink = async (destinationUrl: string, ref?: Ref) => {
   const { shlinkBaseUrl, shlinkShortDomain } = getShlinkConfig();
-  const shlinkApiKey = getShlinkApiKey();
+  const shlinkApiKey = readEnv(process.env.SHLINK_API_KEY);
 
   if (!shlinkApiKey) {
     throw new Error("SHLINK_API_KEY is not configured");
@@ -99,22 +97,6 @@ const createShortLink = async (destinationUrl: string, ref?: refProps) => {
   }
 };
 
-const normalizeDestinationUrl = (url: URL) => {
-  const isLocalhost =
-    url.hostname === "localhost" ||
-    url.hostname === "127.0.0.1" ||
-    url.hostname === "[::1]" ||
-    url.hostname.startsWith("192.168.");
-
-  // Keep localhost URLs as-is, don't normalize them
-  if (isLocalhost) {
-    return url.href;
-  }
-
-  // For non-localhost URLs, keep them as-is as well
-  return url.href;
-};
-
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
   const urlQuery = searchParams.get("url");
@@ -132,7 +114,7 @@ export async function GET(req: NextRequest) {
   }
 
   const ref = isRef(refQuery) ? refQuery : undefined;
-  const destinationUrl = normalizeDestinationUrl(url);
+  const destinationUrl = url.href;
 
   if (
     url.hostname === req.nextUrl.hostname ||

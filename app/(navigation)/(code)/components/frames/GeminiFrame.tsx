@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
-import classNames from "classnames";
+import { cn } from "@/utils/cn";
 import { useAtom, useAtomValue } from "jotai";
 
 import { fileNameAtom, showBackgroundAtom } from "../../store";
@@ -22,7 +22,7 @@ const GeminiFrame = () => {
 
   return (
     <div
-      className={classNames(
+      className={cn(
         sharedStyles.frame,
         styles.frame,
         !darkMode && styles.frameLightMode,
@@ -37,7 +37,7 @@ const GeminiFrame = () => {
       <div className={styles.window}>
         {fileName.length > 0 ? (
           <div className={styles.header}>
-            <div className={classNames(sharedStyles.fileName, styles.fileName)} data-value={fileName}>
+            <div className={cn(sharedStyles.fileName, styles.fileName)} data-value={fileName}>
               <input
                 type="text"
                 value={fileName}
@@ -50,7 +50,7 @@ const GeminiFrame = () => {
           </div>
         ) : flashShown ? null : (
           <div className={styles.header} data-ignore-in-export>
-            <div className={classNames(sharedStyles.fileName, styles.fileName)} data-value={fileName}>
+            <div className={cn(sharedStyles.fileName, styles.fileName)} data-value={fileName}>
               <input
                 type="text"
                 value={fileName}

@@ -14,7 +14,6 @@ import {
   WarningIcon,
   XMarkCircleIcon,
 } from "@raycast/icons";
-import cn from "classnames";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { Button } from "@/components/button";
 import {
@@ -29,6 +28,7 @@ import {
 import { Input, InputSlot } from "@/components/input";
 import { NavigationActions } from "@/components/navigation";
 import { ScrollArea } from "@/components/scroll-area";
+import { cn } from "@/utils/cn";
 import { cleanLocalImage, getLocalImageSupport, inspectLocalImage } from "@/utils/local-image-metadata";
 import { cleanLocalVideo, getLocalVideoSupport, inspectLocalVideo } from "@/utils/local-video-metadata";
 import {

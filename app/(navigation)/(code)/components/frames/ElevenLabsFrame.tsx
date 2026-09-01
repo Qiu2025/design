@@ -1,4 +1,4 @@
-import classNames from "classnames";
+import { cn } from "@/utils/cn";
 import { useAtomValue } from "jotai";
 import { useEffect, useRef, useState } from "react";
 
@@ -56,7 +56,7 @@ const ElevenLabsFrame = () => {
 
   return (
     <div
-      className={classNames(
+      className={cn(
         sharedStyles.frame,
         showBackground && styles.frame,
         showBackground && !darkMode && styles.frameLightMode,
@@ -68,7 +68,7 @@ const ElevenLabsFrame = () => {
       {!showBackground && <div data-ignore-in-export className={sharedStyles.transparentPattern}></div>}
       <div className={styles.window} ref={windowRef}>
         <span
-          className={classNames(styles.circle, isTransitioning && styles.isTransitioning)}
+          className={cn(styles.circle, isTransitioning && styles.isTransitioning)}
           style={{
             width: `${circleDiameter}px`,
             height: `${circleDiameter}px`,

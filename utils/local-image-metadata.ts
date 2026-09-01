@@ -265,8 +265,3 @@ export const cleanLocalImage = async (
     report: buildVerificationReport(entries, verifiedImage.entries, selectedIds),
   };
 };
-
-export const disposeLocalImageEngine = async () => {
-  const { dispose } = await import("@uswriting/exiftool");
-  await dispose();
-};

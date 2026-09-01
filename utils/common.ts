@@ -1,5 +1,3 @@
-import { refProps } from "@/app/api/shorten-url/route";
-
 const resolveBaseUrl = () => {
   if (process.env.NEXT_PUBLIC_APP_URL) {
     return process.env.NEXT_PUBLIC_APP_URL;
@@ -21,20 +19,3 @@ const resolveBaseUrl = () => {
 };
 
 export const BASE_URL = resolveBaseUrl();
-
-export async function shortenUrl(url: string, ref: refProps) {
-  const endpoint =
-    globalThis.window === undefined
-      ? `${BASE_URL}/api/shorten-url?url=${encodeURIComponent(url)}&ref=${ref}`
-      : `/api/shorten-url?url=${encodeURIComponent(url)}&ref=${ref}`;
-
-  const response = await fetch(endpoint).then((res) => res.json());
-
-  if (response.link) {
-    return response.link as string;
-  }
-
-  console.error("Failed to shorten URL", response);
-
-  throw new Error("Unable to shorten this link");
-}

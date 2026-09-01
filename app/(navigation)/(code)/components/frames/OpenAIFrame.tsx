@@ -1,4 +1,4 @@
-import classNames from "classnames";
+import { cn } from "@/utils/cn";
 import { useAtom, useAtomValue } from "jotai";
 import React from "react";
 
@@ -17,7 +17,7 @@ const OpenAIFrame = () => {
 
   return (
     <div
-      className={classNames(
+      className={cn(
         styles.frame,
         !darkMode && styles.frameLightMode,
         !showBackground && sharedStyles.noBackground,

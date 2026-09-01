@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState, useMemo } from "react";
 import { useAtom } from "jotai";
 import { CSSTransition } from "react-transition-group";
 import { derivedFlashMessageAtom, flashShownAtom } from "../store/flash";
-import classNames from "classnames";
+import { cn } from "@/utils/cn";
 import useAudio from "../util/useAudio";
 
 import styles from "./FlashMessage.module.css";
@@ -24,8 +24,8 @@ const FlashMessage: React.FC = () => {
       {flashMessage?.variant === "unlock" ? (
         <div className={styles.unlockContainer} ref={containerRef}>
           <div className={styles.coin}>
-            <div className={classNames(styles.coinFront, styles.coinSide)}>{flashMessage?.icon}</div>
-            <div className={classNames(styles.coinBack, styles.coinSide)}>{flashMessage?.icon}</div>
+            <div className={cn(styles.coinFront, styles.coinSide)}>{flashMessage?.icon}</div>
+            <div className={cn(styles.coinBack, styles.coinSide)}>{flashMessage?.icon}</div>
           </div>
           <span className={styles.unlockFlash}>{flashMessage?.message}</span>
         </div>

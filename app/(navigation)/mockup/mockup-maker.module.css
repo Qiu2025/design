@@ -231,7 +231,6 @@
 }
 
 .controlLabel,
-.rangeRow > span,
 .checkboxRow {
   color: hsl(var(--gray-10));
   font-size: 11px;
@@ -324,30 +323,6 @@
 .segmentButtonActive {
   background: var(--gray-a4);
   color: hsl(var(--gray-12));
-}
-
-.rangeRow {
-  display: flex;
-  flex-direction: column;
-  margin-top: 14px;
-  gap: 7px;
-}
-
-.rangeRow > span {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.rangeRow output {
-  color: hsl(var(--gray-11));
-  font-variant-numeric: tabular-nums;
-}
-
-.rangeRow input[type="range"] {
-  width: 100%;
-  accent-color: hsl(var(--brand));
-  cursor: pointer;
 }
 
 .positionRow {

@@ -7,8 +7,8 @@ import {
   Source_Code_Pro,
   Space_Mono,
 } from "next/font/google";
-import cn from "classnames";
 import { Navigation } from "@/components/navigation";
+import { cn } from "@/utils/cn";
 import localFont from "next/font/local";
 import React from "react";
 

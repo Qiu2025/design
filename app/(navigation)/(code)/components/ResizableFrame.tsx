@@ -1,7 +1,7 @@
 import React, { MouseEventHandler, PropsWithChildren, useCallback, useRef, useState } from "react";
 import { useAtom } from "jotai";
 import { windowWidthAtom } from "../store";
-import classnames from "classnames";
+import { cn } from "@/utils/cn";
 import { CSSTransition } from "react-transition-group";
 
 import styles from "./ResizableFrame.module.css";
@@ -77,15 +77,9 @@ const ResizableFrame: React.FC<PropsWithChildren> = ({ children }) => {
   );
 
   return (
-    <div className={classnames(styles.resizableFrame, isResizing && styles.isResizing)}>
-      <div
-        className={classnames(styles.windowSizeDragPoint, styles.left)}
-        onMouseDown={handleResizeFrameX("left")}
-      ></div>
-      <div
-        className={classnames(styles.windowSizeDragPoint, styles.right)}
-        onMouseDown={handleResizeFrameX("right")}
-      ></div>
+    <div className={cn(styles.resizableFrame, isResizing && styles.isResizing)}>
+      <div className={cn(styles.windowSizeDragPoint, styles.left)} onMouseDown={handleResizeFrameX("left")}></div>
+      <div className={cn(styles.windowSizeDragPoint, styles.right)} onMouseDown={handleResizeFrameX("right")}></div>
       <div ref={windowRef} style={{ width: windowWidth || "auto" }}>
         {children}
       </div>

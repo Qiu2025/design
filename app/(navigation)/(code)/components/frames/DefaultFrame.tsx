@@ -1,4 +1,4 @@
-import classNames from "classnames";
+import { cn } from "@/utils/cn";
 import { useAtom, useAtomValue } from "jotai";
 
 import { fileNameAtom, showBackgroundAtom } from "../../store";
@@ -19,7 +19,7 @@ const DefaultFrame = () => {
 
   return (
     <div
-      className={classNames(
+      className={cn(
         styles.frame,
         styles[theme.id],
         darkMode && styles.darkMode,
@@ -32,7 +32,7 @@ const DefaultFrame = () => {
     >
       {!showBackground && <div data-ignore-in-export className={styles.transparentPattern}></div>}
       <div
-        className={classNames(styles.window, {
+        className={cn(styles.window, {
           [styles.withBorder]: !isSafari,
           [styles.withShadow]: !isSafari && showBackground,
         })}

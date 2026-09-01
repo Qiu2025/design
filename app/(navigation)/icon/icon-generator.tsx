@@ -4,7 +4,7 @@ import React, { use, useCallback, useEffect, useRef, useState } from "react";
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import cn from "classnames";
+import { cn } from "@/utils/cn";
 import { CSSTransition } from "react-transition-group";
 import { ColorChangeHandler } from "react-color";
 import dynamic from "next/dynamic";
@@ -599,7 +599,6 @@ export const IconGenerator = () => {
   const [recentColors, setRecentColors] = useState<string[]>([]);
   const [showExportModal, setShowExportModal] = useState<boolean>(false);
   const [panelsVisible, setPanelsVisible] = useState<boolean>(true);
-  const [headerVisible, setHeaderVisible] = useState<boolean>(true);
   const [infoMessage, setInfoMessage] = useState<string>();
   const [infoMessageVisible, setInfoMessageVisible] = useState<boolean>(false);
   const [showInfoMessageUndoButton, setShowInfoMessageUndoButton] = useState<boolean>(true);
