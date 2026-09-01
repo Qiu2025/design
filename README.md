@@ -10,47 +10,9 @@
 This repository contains the source code for [design.sqiu.dev](https://design.sqiu.dev), a collection of small browser tools. It includes:
 
 - [**Code Images**](</app/(navigation)/(code)>): Create beautiful images of your code.
-- [**Icon Maker**](</app/(navigation)/icon/>): Create beautiful icons for your apps and projects.
-- [**Metadata Remover**](</app/(navigation)/metadata/>): Clean and verify image metadata locally, with local-first video processing and an optional server fallback.
-
-## Setup
-
-To get started, clone the repo, install dependencies and run the development server:
-
-```bash
-npm install
-npm run dev
-```
-
-The server video fallback requires `ffmpeg` and `ffprobe`. When they are not on `PATH`, set `FFMPEG_PATH` and
-`FFPROBE_PATH`. The production Docker image installs both tools.
-
-URL shortening is optional and configured at runtime with `SHLINK_BASE_URL`, `SHLINK_API_KEY`, and optionally
-`SHLINK_SHORT_DOMAIN`. When `SHLINK_SHORT_DOMAIN` is omitted, the hostname from `SHLINK_BASE_URL` is used.
-
-With `docker run`:
-
-```bash
-docker run -p 4000:4000 \
-  -e SHLINK_BASE_URL=https://go.example.com \
-  -e SHLINK_SHORT_DOMAIN=go.example.com \
-  -e SHLINK_API_KEY=your-api-key \
-  your-image
-```
-
-Or with Docker Compose:
-
-```yaml
-services:
-  design:
-    image: your-image
-    ports:
-      - "4000:4000"
-    environment:
-      SHLINK_BASE_URL: https://go.example.com
-      SHLINK_SHORT_DOMAIN: go.example.com
-      SHLINK_API_KEY: ${SHLINK_API_KEY}
-```
+- [**Icon Maker**](</app/(navigation)/icon/>): Create beautiful icons.
+- [**Mockup Maker**·](/app/(navigation)/mockup/>): Create device mockups from screenshots.
+- [**Metadata Remover**](</app/(navigation)/metadata/>): Remove metadata from images and videos.
 
 ## Credits
 
