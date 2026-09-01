@@ -46,6 +46,16 @@ const isRef = (value: string | null): value is Ref => {
   return value !== null && refs.includes(value as Ref);
 };
 
+const getHostname = (host: string | null) => {
+  if (!host) return undefined;
+
+  try {
+    return new URL(`http://${host}`).hostname;
+  } catch {
+    return undefined;
+  }
+};
+
 const getErrorDetails = (error: unknown) => {
   const cause = error instanceof Error && typeof error.cause === "object" ? error.cause : null;
   const causeCode = cause && "code" in cause && typeof cause.code === "string" ? cause.code : undefined;
@@ -135,8 +145,10 @@ export async function GET(req: NextRequest) {
 
   const ref = isRef(refQuery) ? refQuery : undefined;
   const destinationUrl = url.href;
+  const requestHostname = getHostname(req.headers.get("host"));
   const logContext = {
     requestHost: req.headers.get("host"),
+    requestHostname,
     forwardedHost: req.headers.get("x-forwarded-host"),
     nextUrlHost: req.nextUrl.hostname,
     destinationHost: url.hostname,
@@ -147,7 +159,7 @@ export async function GET(req: NextRequest) {
   console.info("[shorten-url] Request received.", logContext);
 
   const isAllowedDestination =
-    url.hostname === req.nextUrl.hostname ||
+    url.hostname === requestHostname ||
     url.hostname === "localhost" ||
     url.hostname === "127.0.0.1" ||
     url.hostname === "[::1]" ||
