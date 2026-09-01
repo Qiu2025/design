@@ -11,7 +11,7 @@ This repository contains the source code for [design.sqiu.dev](https://design.sq
 
 - [**Code Images**](</app/(navigation)/(code)>): Create beautiful images of your code.
 - [**Icon Maker**](</app/(navigation)/icon/>): Create beautiful icons.
-- [**Mockup Maker**·](/app/(navigation)/mockup/>): Create device mockups from screenshots.
+- [**Mockup Maker**·](</app/(navigation)/mockup/>): Create device mockups from screenshots.
 - [**Metadata Remover**](</app/(navigation)/metadata/>): Remove metadata from images and videos.
 
 ## Credits
