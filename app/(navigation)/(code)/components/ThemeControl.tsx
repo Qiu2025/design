@@ -93,7 +93,7 @@ const ThemeControl: React.FC = () => {
 
   const groupedItems: ThemeGroup[] = useMemo(
     () => [
-      { label: "Partners", items: partnerThemes },
+      { label: "Brand Themes", items: partnerThemes },
       { label: "Themes", items: themes },
     ],
     [partnerThemes, themes],
