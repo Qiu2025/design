@@ -12,6 +12,18 @@ type PropTypes = {
   code: string;
 };
 
+function formatPlaintext(code: string, highlightedLines: number[]) {
+  return code
+    .split("\n")
+    .map((line, index) => {
+      const lineNumber = index + 1;
+      const className = highlightedLines.includes(lineNumber) ? "line highlighted-line" : "line";
+      const escapedLine = line.replace(/[\u00A0-\u9999<>\&]/g, (character) => `&#${character.charCodeAt(0)};`);
+      return `<span class="${className}" data-line="${lineNumber}">${escapedLine}</span>`;
+    })
+    .join("\n");
+}
+
 const HighlightedCode: React.FC<PropTypes> = ({ selectedLanguage, code }) => {
   const [highlightedHtml, setHighlightedHtml] = useState("");
   const highlighter = useAtomValue(highlighterAtom);
@@ -23,7 +35,11 @@ const HighlightedCode: React.FC<PropTypes> = ({ selectedLanguage, code }) => {
 
   useEffect(() => {
     const generateHighlightedHtml = async () => {
-      if (!highlighter || !selectedLanguage || selectedLanguage === LANGUAGES.plaintext) {
+      if (selectedLanguage === LANGUAGES.plaintext) {
+        return formatPlaintext(code, highlightedLines);
+      }
+
+      if (!highlighter || !selectedLanguage) {
         return code.replace(/[\u00A0-\u9999<>\&]/g, (i) => `&#${i.charCodeAt(0)};`);
       }
 
