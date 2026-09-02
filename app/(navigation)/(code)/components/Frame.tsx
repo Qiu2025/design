@@ -43,7 +43,6 @@ const Frame = ({ resize = true }: { resize?: boolean }) => {
   function renderFrame() {
     switch (theme.id) {
       case THEMES.vercel.id:
-      case THEMES.rabbit.id:
         return <VercelFrame />;
       case THEMES.supabase.id:
         return <SupabaseFrame />;

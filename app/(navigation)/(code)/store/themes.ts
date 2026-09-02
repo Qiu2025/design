@@ -1,5 +1,4 @@
 import { atom } from "jotai";
-import { atomWithStorage } from "jotai/utils";
 import { CSSProperties } from "react";
 import { Font } from "./font";
 import { atomWithCodeImagesHash } from "../util/shareState";
@@ -9,8 +8,6 @@ import CloudflareLogo from "../assets/cloudflare.svg";
 import CloudflareLogoUrl from "../assets/cloudflare.svg?url";
 import VercelLogo from "../assets/vercel.svg";
 import VercelLogoUrl from "../assets/vercel.svg?url";
-import RabbitLogo from "../assets/rabbit.svg";
-import RabbitLogoUrl from "../assets/rabbit.svg?url";
 import SupabaseLogo from "../assets/supabase.svg";
 import SupabaseLogoUrl from "../assets/supabase.svg?url";
 import TailwindLogo from "../assets/tailwind.svg";
@@ -109,7 +106,6 @@ export type Theme = {
   iconUrl?: string;
   font?: Font;
   partner?: boolean;
-  hidden?: boolean;
   lineNumbers?: boolean;
   lineNumbersToggleable?: boolean;
   syntax: { light: CSSProperties; dark?: CSSProperties } | { light?: CSSProperties; dark: CSSProperties };
@@ -165,53 +161,6 @@ export const THEMES: { [index: string]: Theme } = {
         highlightBorder: "oklch(71.7% 0.1648 250.79360374054167)",
         diffDeleted: "oklch(62.56% 0.2277 23.03)",
         diffInserted: "oklch(58.11% 0.1815 146.55)",
-      }),
-    },
-  },
-  rabbit: {
-    id: "rabbit",
-    name: "Evil Rabbit",
-    background: {
-      from: "#000000",
-      to: "#000000",
-    },
-    icon: RabbitLogo,
-    iconUrl: RabbitLogoUrl,
-    font: "geist-mono",
-    partner: true,
-    hidden: true,
-    syntax: {
-      light: convertToShikiTheme({
-        foreground: "#111111",
-        constant: "#666666",
-        parameter: "#666666",
-        stringExpression: "#666666",
-        keyword: "#666666",
-        function: "#111111",
-        punctuation: "#666666",
-        string: "#666666",
-        comment: "#999999",
-        link: "#666666",
-        number: "#111111",
-        property: "#666666",
-        diffInserted: "#666666",
-        diffDeleted: "#666666",
-      }),
-      dark: convertToShikiTheme({
-        foreground: "#ffffff",
-        constant: "#a7a7a7",
-        parameter: "#a7a7a7",
-        stringExpression: "#a7a7a7",
-        keyword: "#a7a7a7",
-        function: "#ffffff",
-        punctuation: "#a7a7a7",
-        string: "#a7a7a7",
-        comment: "#666666",
-        link: "#a7a7a7",
-        number: "#ffffff",
-        property: "#a7a7a7",
-        diffInserted: "#a7a7a7",
-        diffDeleted: "#a7a7a7",
       }),
     },
   },
@@ -1626,8 +1575,6 @@ const themeLineNumbersAtom = atom<boolean>((get) => {
   return get(showLineNumbersAtom) ?? false;
 });
 
-const unlockedThemesAtom = atomWithStorage<Theme["id"][]>("unlockedThemes", []);
-
 export {
   darkModeAtom,
   themeAtom,
@@ -1636,5 +1583,4 @@ export {
   themeDarkModeAtom,
   themeFontAtom,
   themeLineNumbersAtom,
-  unlockedThemesAtom,
 };

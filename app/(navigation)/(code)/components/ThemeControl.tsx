@@ -1,6 +1,6 @@
 import { useAtom } from "jotai";
 import React, { useEffect, useMemo } from "react";
-import { themeAtom, THEMES, Theme, unlockedThemesAtom } from "../store/themes";
+import { themeAtom, THEMES, Theme } from "../store/themes";
 import ControlContainer from "./ControlContainer";
 
 import styles from "./ThemeControl.module.css";
@@ -48,7 +48,6 @@ function ThemePreview({ theme }: { theme: Theme }) {
 const ThemeControl: React.FC = () => {
   const [currentTheme, atomSetTheme] = useAtom(themeAtom);
   const [padding, setPadding] = useAtom(paddingAtom);
-  const [unlockedThemes, setUnlockedThemes] = useAtom(unlockedThemesAtom);
 
   const setTheme = (theme: Theme) => {
     atomSetTheme(theme);
@@ -60,13 +59,13 @@ const ThemeControl: React.FC = () => {
   };
 
   useEffect(() => {
-    if (currentTheme.name === THEMES.vercel.name || currentTheme.name === THEMES.rabbit.name) {
+    if (currentTheme.name === THEMES.vercel.name) {
       setPadding(64);
     }
   }, [currentTheme, setPadding]);
 
   useHotkeys("c", () => {
-    const availableThemes = Object.values(THEMES).filter((theme) => unlockedThemes.includes(theme.id) || !theme.hidden);
+    const availableThemes = Object.values(THEMES);
     const currentIndex = availableThemes.indexOf(currentTheme);
     if (Object.values(availableThemes)[currentIndex + 1]) {
       setTheme(Object.values(availableThemes)[currentIndex + 1]);
@@ -92,20 +91,12 @@ const ThemeControl: React.FC = () => {
     [],
   );
 
-  const filteredPartnerThemes = useMemo(
-    () =>
-      partnerThemes.filter(
-        (theme) => unlockedThemes.includes(theme.id) || !theme.hidden || theme.name === currentTheme.name,
-      ),
-    [partnerThemes, unlockedThemes, currentTheme.name],
-  );
-
   const groupedItems: ThemeGroup[] = useMemo(
     () => [
-      { label: "Partners", items: filteredPartnerThemes },
+      { label: "Partners", items: partnerThemes },
       { label: "Themes", items: themes },
     ],
-    [filteredPartnerThemes, themes],
+    [partnerThemes, themes],
   );
 
   return (
