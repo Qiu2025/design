@@ -1,10 +1,17 @@
 const withBundleAnalyzer = require("@next/bundle-analyzer")({
   enabled: process.env.ANALYZE === "true",
 });
+const { networkInterfaces } = require("node:os");
+
+const localDevOrigins = Object.values(networkInterfaces())
+  .flatMap((addresses) => addresses ?? [])
+  .filter(({ internal }) => !internal)
+  .map(({ address }) => address);
 
 /** @type {import('next').NextConfig} */
 
 const nextConfig = {
+  allowedDevOrigins: localDevOrigins,
   output: "standalone",
   outputFileTracingIncludes: {
     "/api/metadata/assets/*": [
