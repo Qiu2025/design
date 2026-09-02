@@ -66,6 +66,9 @@ const getErrorDetails = (error: unknown) => {
   };
 };
 
+const formatLog = (event: string, details: Record<string, unknown>) =>
+  `[shorten-url] ${JSON.stringify({ event, ...details })}`;
+
 const requestShlinkShortUrl = async (payload: Record<string, unknown>, shlinkApiKey: string, shlinkBaseUrl: string) => {
   const response = await fetch(`${shlinkBaseUrl}/rest/v3/short-urls`, {
     method: "POST",
@@ -95,14 +98,6 @@ const createShortLink = async (destinationUrl: string, ref?: Ref) => {
   const shlinkApiKey = readEnv(process.env.SHLINK_API_KEY);
   const destinationHost = new URL(destinationUrl).hostname;
 
-  console.info("[shorten-url] Sending request to Shlink.", {
-    shlinkBaseUrl,
-    shlinkShortDomain,
-    apiKeyConfigured: Boolean(shlinkApiKey),
-    destinationHost,
-    ref,
-  });
-
   if (!shlinkApiKey) {
     throw new Error("SHLINK_API_KEY is not configured");
   }
@@ -116,13 +111,15 @@ const createShortLink = async (destinationUrl: string, ref?: Ref) => {
   try {
     return await requestShlinkShortUrl({ ...payload, domain: shlinkShortDomain }, shlinkApiKey, shlinkBaseUrl);
   } catch (error) {
-    console.warn("[shorten-url] Domain-specific request failed; retrying without a domain.", {
-      shlinkBaseUrl,
-      shlinkShortDomain,
-      destinationHost,
-      ref,
-      ...getErrorDetails(error),
-    });
+    console.warn(
+      formatLog("retry_without_domain", {
+        shlinkHost: new URL(shlinkBaseUrl).host,
+        shortDomain: shlinkShortDomain,
+        destinationHost,
+        ref,
+        ...getErrorDetails(error),
+      }),
+    );
     return requestShlinkShortUrl(payload, shlinkApiKey, shlinkBaseUrl);
   }
 };
@@ -147,16 +144,9 @@ export async function GET(req: NextRequest) {
   const destinationUrl = url.href;
   const requestHostname = getHostname(req.headers.get("host"));
   const logContext = {
-    requestHost: req.headers.get("host"),
-    requestHostname,
-    forwardedHost: req.headers.get("x-forwarded-host"),
-    nextUrlHost: req.nextUrl.hostname,
     destinationHost: url.hostname,
-    cfRay: req.headers.get("cf-ray"),
     ref,
   };
-
-  console.info("[shorten-url] Request received.", logContext);
 
   const isAllowedDestination =
     url.hostname === requestHostname ||
@@ -166,19 +156,21 @@ export async function GET(req: NextRequest) {
     url.hostname.startsWith("192.168.");
 
   if (!isAllowedDestination) {
-    console.warn("[shorten-url] Request rejected: destination host is not allowed.", logContext);
+    console.warn(
+      formatLog("rejected", {
+        ...logContext,
+        requestHost: requestHostname,
+        cfRay: req.headers.get("cf-ray") || undefined,
+      }),
+    );
     return NextResponse.json({ error: "Unable to shorten this link" }, { status: 400 });
   }
 
   try {
     const shortUrl = await createShortLink(destinationUrl, ref);
-    console.info("[shorten-url] Short link created.", logContext);
     return NextResponse.json({ link: shortUrl });
   } catch (error) {
-    console.error("[shorten-url] Shortening failed; returning the original URL.", {
-      ...logContext,
-      ...getErrorDetails(error),
-    });
+    console.error(formatLog("fallback", { ...logContext, ...getErrorDetails(error) }));
     // Fallback: keep the original long URL when shortener is unavailable.
     return NextResponse.json({ link: destinationUrl });
   }
