@@ -14,7 +14,6 @@ import {
   ComboboxGroup,
   ComboboxGroupLabel,
   ComboboxItem,
-  ComboboxSeparator,
   ComboboxValue,
   ComboboxEmpty,
 } from "@/components/combobox";
@@ -115,13 +114,13 @@ const ThemeControl: React.FC = () => {
         <ComboboxTrigger size="small" className="w-[60px]" icon={ChevronUpIcon}>
           <ComboboxValue<Theme>>{(value) => (value ? <ThemePreview theme={value} /> : "Select theme")}</ComboboxValue>
         </ComboboxTrigger>
-        <ComboboxContent showSearchIcon>
+        <ComboboxContent showSearchIcon className="w-[min(25rem,calc(100vw-2rem))] [&_input]:w-full">
           <ComboboxEmpty>No themes found.</ComboboxEmpty>
-          <ComboboxList<ThemeGroup>>
+          <ComboboxList<ThemeGroup> className="grid grid-cols-[minmax(0,1fr)_1px_minmax(0,1fr)] p-2">
             {(group, groupIndex) => (
               <React.Fragment key={group.label}>
-                {groupIndex > 0 && <ComboboxSeparator />}
-                <ComboboxGroup items={group.items}>
+                {groupIndex > 0 && <div aria-hidden className="bg-gray-4" />}
+                <ComboboxGroup items={group.items} className={groupIndex > 0 ? "min-w-0 pl-2" : "min-w-0 pr-2"}>
                   <ComboboxGroupLabel>{group.label}</ComboboxGroupLabel>
                   {group.items.map((theme) => (
                     <ComboboxItem key={theme.id} value={theme}>
