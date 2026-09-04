@@ -10,6 +10,9 @@ import { toast } from "@/components/toast";
 import { cn } from "@/utils/cn";
 import { useEffect, useState } from "react";
 
+const formatToastClassName =
+  "!left-1/2 !w-fit !max-w-[calc(100vw-2rem)] !-translate-x-1/2 !border-gray-a5 !px-3.5 !py-3 !shadow-[0_8px_30px_rgba(0,0,0,0.35)] max-sm:!top-[54px] max-sm:!left-[calc(50%-16px)]";
+
 const FormatButton: React.FC = () => {
   const [selectedLanguage, setSelectedLanguage] = useAtom(selectedLanguageAtom);
   const [code, setCode] = useAtom(codeAtom);
@@ -37,17 +40,16 @@ const FormatButton: React.FC = () => {
         setSelectedLanguage(language);
       }),
       {
+        className: formatToastClassName,
         loading: "Formatting code...",
         success: "Formatted code!",
         error: (error) => {
-          const errorMessage = error.message;
+          const errorMessage =
+            error instanceof Error ? error.message.split("\n", 1)[0] : "Check the selected language and syntax.";
           return {
             message: "Code formatting failed",
-            description: () => (
-              <pre className="w-full overflow-auto text-xs scrollbar-hide bg-gray-a3 p-2.5 rounded max-w-[300px]">
-                <code className="w-full">{errorMessage}</code>
-              </pre>
-            ),
+            description: errorMessage,
+            className: formatToastClassName,
           };
         },
       },
