@@ -67,13 +67,14 @@ const FormatButton: React.FC = () => {
     <Button
       onClick={handleFormatCode}
       variant="transparent"
+      aria-label="Format code"
       className={cn(
         "hidden",
-        selectedLanguage && formatterSupportedLanguages.includes(selectedLanguage.name) && "md:inline-flex",
+        selectedLanguage && formatterSupportedLanguages.includes(selectedLanguage.name) && "inline-flex",
       )}
     >
       <WandIcon width={16} height={16} />
-      Format Code
+      <span className="hidden md:inline">Format Code</span>
     </Button>
   );
 };

@@ -149,7 +149,8 @@ const ExportButton: React.FC = () => {
     <ButtonGroup>
       <Button onClick={handleExportClick} variant="primary" aria-label="Export as PNG">
         <DownloadIcon className="w-4 h-4" />
-        Export <span className="hidden md:inline-block">Image</span>
+        <span className="hidden min-[360px]:inline">Export</span>
+        <span className="hidden md:inline-block">Image</span>
       </Button>
       <DropdownMenu open={dropdownOpen} onOpenChange={(open) => setDropdownOpen(open)}>
         <DropdownMenuTrigger asChild>

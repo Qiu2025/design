@@ -12,6 +12,7 @@ const localDevOrigins = Object.values(networkInterfaces())
 
 const nextConfig = {
   allowedDevOrigins: localDevOrigins,
+  devIndicators: false,
   output: "standalone",
   outputFileTracingIncludes: {
     "/api/metadata/assets/*": [

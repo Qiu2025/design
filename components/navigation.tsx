@@ -106,13 +106,14 @@ export function Navigation() {
             <DropdownMenuTrigger asChild>
               <Button
                 variant="transparent"
+                aria-label={`Switch tool, current tool: ${activeLink.label}`}
                 className="h-8 w-max justify-between gap-2 rounded-full border border-gray-a3 bg-gray-a2/60 px-2.5 text-gray-12 shadow-[inset_0_1px_0_hsla(0,0%,100%,0.035)] hover:bg-gray-a3"
               >
                 <div className="flex min-w-0 items-center gap-2">
                   <div className="flex h-6 w-6 shrink-0 items-center justify-center text-gray-12">
                     <activeLink.icon className="h-6 w-6" />
                   </div>
-                  <span className="whitespace-nowrap text-sm font-medium">{activeLink.label}</span>
+                  <span className="hidden whitespace-nowrap text-sm font-medium sm:inline">{activeLink.label}</span>
                 </div>
                 <ChevronDownIcon className="h-4 w-4 shrink-0 text-gray-11" />
               </Button>

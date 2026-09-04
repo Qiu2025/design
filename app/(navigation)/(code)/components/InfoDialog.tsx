@@ -16,8 +16,9 @@ export function InfoDialog() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="transparent" className="hidden md:flex gap-2">
-          <Info02Icon /> About
+        <Button variant="transparent" className="gap-2" aria-label="About Code Images">
+          <Info02Icon />
+          <span className="hidden md:inline">About</span>
         </Button>
       </DialogTrigger>
       <DialogContent size="large">

@@ -40,6 +40,12 @@
   --translate-x: 50%;
 }
 
+@media (max-width: 767px), (max-width: 1119px) and (max-height: 500px) {
+  .windowSizeDragPoint {
+    display: none;
+  }
+}
+
 .resetWidthContainer {
   position: absolute;
   right: 0;

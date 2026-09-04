@@ -1121,9 +1121,11 @@ export function MockupMaker() {
               onClick={() => void savePng()}
               disabled={!imageUrl || isReading || isExporting}
               aria-busy={isExporting}
+              aria-label={isExporting ? "Exporting mockup" : "Export mockup"}
             >
               <DownloadIcon className="h-4 w-4" />
-              {isExporting ? "Exporting" : "Export Mockup"}
+              <span className="hidden min-[360px]:inline sm:hidden">{isExporting ? "Exporting" : "Export"}</span>
+              <span className="hidden sm:inline">{isExporting ? "Exporting" : "Export Mockup"}</span>
             </Button>
             <DropdownMenu open={dropdownOpen} onOpenChange={setDropdownOpen}>
               <DropdownMenuTrigger asChild>

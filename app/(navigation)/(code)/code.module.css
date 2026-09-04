@@ -12,5 +12,10 @@
   grid-template-columns: 1fr;
   grid-template-rows: 15px auto 110px;
   isolation: isolate;
+  overflow-x: hidden;
   overflow-y: auto;
+
+  @media (max-width: 767px), (max-width: 1119px) and (max-height: 500px) {
+    padding-bottom: 0;
+  }
 }

@@ -1125,18 +1125,6 @@ export const IconGenerator = () => {
     { value: "0%,50%", label: "Left" },
   ];
 
-  const onShare = async () => {
-    try {
-      const url = buildShareUrl();
-      await navigator.share({
-        title: "Design Icon",
-        url,
-      });
-    } catch (err) {
-      console.error("sharing not available");
-    }
-  };
-
   return (
     <div className={styles.container}>
       <ExportModal
@@ -1210,17 +1198,18 @@ export const IconGenerator = () => {
           </div>
         </div>
         <div className={cn(styles.actions, styles.actionsRight)}>
-          <div className="flex gap-2 sm:hidden">
-            <Button variant="primary" className={styles.exportButton} onClick={onShare}>
-              <DownloadIcon /> Share Icon
-            </Button>
-          </div>
-          <div className="sm:flex gap-2 hidden">
+          <div className="flex gap-2">
             <InfoDialog />
             <ButtonGroup>
-              <Button variant="primary" className={styles.exportButton} onClick={() => setShowExportModal(true)}>
+              <Button
+                variant="primary"
+                className={styles.exportButton}
+                aria-label="Export icon"
+                onClick={() => setShowExportModal(true)}
+              >
                 <DownloadIcon />
-                Export icon
+                <span className="hidden min-[360px]:inline sm:hidden">Export</span>
+                <span className="hidden sm:inline">Export icon</span>
               </Button>
               <DropdownMenu open={exportDropdownOpen} onOpenChange={setExportDropdownOpen}>
                 <DropdownMenuTrigger asChild>
