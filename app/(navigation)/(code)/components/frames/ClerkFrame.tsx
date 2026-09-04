@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
-import classNames from "classnames";
+import { cn } from "@/utils/cn";
 import { useAtom, useAtomValue } from "jotai";
 
 import { showBackgroundAtom } from "../../store";
@@ -18,7 +18,7 @@ const ClerkFrame = () => {
 
   return (
     <div
-      className={classNames(
+      className={cn(
         sharedStyles.frame,
         showBackground && styles.frame,
         !darkMode && styles.frameLightMode,

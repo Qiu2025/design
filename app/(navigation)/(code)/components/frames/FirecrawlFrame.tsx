@@ -1,4 +1,4 @@
-import classNames from "classnames";
+import { cn } from "@/utils/cn";
 import { useAtom, useAtomValue } from "jotai";
 import React, { useEffect, useRef, useState } from "react";
 
@@ -124,7 +124,7 @@ const FirecrawlFrame = () => {
 
   return (
     <div
-      className={classNames(
+      className={cn(
         sharedStyles.frame,
         showBackground && styles.frame,
         showBackground && !darkMode && styles.frameLightMode,

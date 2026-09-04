@@ -10,20 +10,11 @@ import React, {
 import styles from "./Editor.module.css";
 import { useAtom, useSetAtom } from "jotai";
 import { codeAtom, isCodeExampleAtom, selectedLanguageAtom } from "../store/code";
-import {
-  THEMES,
-  themeAtom,
-  themeCSSAtom,
-  themeFontAtom,
-  themeLineNumbersAtom,
-  unlockedThemesAtom,
-} from "../store/themes";
+import { themeCSSAtom, themeFontAtom, themeLineNumbersAtom } from "../store/themes";
 import useHotkeys from "../../../../utils/useHotkeys";
 import HighlightedCode from "./HighlightedCode";
-import classNames from "classnames";
-import { derivedFlashMessageAtom } from "../store/flash";
+import { cn } from "@/utils/cn";
 import { highlightedLinesAtom, showLineNumbersAtom } from "../store";
-import { LANGUAGES } from "../util/languages";
 
 function indentText(text: string) {
   return text
@@ -137,9 +128,6 @@ function Editor() {
   const [themeCSS] = useAtom(themeCSSAtom);
   const [isCodeExample] = useAtom(isCodeExampleAtom);
   const [themeFont] = useAtom(themeFontAtom);
-  const [theme, setTheme] = useAtom(themeAtom);
-  const [unlockedThemes, setUnlockedThemes] = useAtom(unlockedThemesAtom);
-  const setFlashMessage = useSetAtom(derivedFlashMessageAtom);
   const setHighlightedLines = useSetAtom(highlightedLinesAtom);
   const [isHighlightingLines, setIsHighlightingLines] = useState(false);
   const [showLineNumbers] = useAtom(themeLineNumbersAtom);
@@ -174,26 +162,9 @@ function Editor() {
 
   const handleChange = useCallback<ChangeEventHandler<HTMLTextAreaElement>>(
     (event) => {
-      if (event.target.value.includes("🐰") && theme.id !== THEMES.rabbit.id) {
-        if (!unlockedThemes.includes(THEMES.rabbit.id)) {
-          setUnlockedThemes([...unlockedThemes, THEMES.rabbit.id]);
-        }
-        setTheme(THEMES.rabbit);
-        try {
-          localStorage.setItem("codeTheme", THEMES.rabbit.id);
-        } catch (error) {
-          console.log("Could not set theme in localStorage", error);
-        }
-        setFlashMessage({
-          message: "Evil Rabbit Theme Unlocked",
-          variant: "unlock",
-          timeout: 2000,
-          icon: React.createElement(THEMES.rabbit.icon || "", { style: { color: "black" } }),
-        });
-      }
       setCode(event.target.value);
     },
-    [setCode, setTheme, setFlashMessage, setUnlockedThemes, unlockedThemes, theme.id],
+    [setCode],
   );
 
   const handleFocus = useCallback<FocusEventHandler>(() => {
@@ -253,15 +224,11 @@ function Editor() {
 
   return (
     <div
-      className={classNames(
+      className={cn(
         styles.editor,
         themeFont ? fontMap[themeFont] : styles.jetBrainsMono,
         isHighlightingLines && styles.isHighlightingLines,
-        showLineNumbers &&
-          selectedLanguage !== LANGUAGES.plaintext && [
-            styles.showLineNumbers,
-            numberOfLines > 8 && styles.showLineNumbersLarge,
-          ],
+        showLineNumbers && [styles.showLineNumbers, numberOfLines > 8 && styles.showLineNumbersLarge],
       )}
       style={{ "--editor-padding": "16px", ...themeCSS } as React.CSSProperties}
       data-value={code}

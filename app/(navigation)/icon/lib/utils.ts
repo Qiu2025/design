@@ -1,16 +1,6 @@
-export const randomColor = () =>
-  "#" +
-  Math.floor(Math.random() * 16777215)
-    .toString(16)
-    .toUpperCase();
-
 export function randomElement<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)];
 }
-
-export const randomNumberBetween = (min: number, max: number) => {
-  return Math.round(Math.random() * (max - min) + min);
-};
 
 export function uniq<T>(arr: T[]): T[] {
   return arr.filter((value, index, self) => self.indexOf(value) === index);

@@ -1,4 +1,4 @@
-import classNames from "classnames";
+import { cn } from "@/utils/cn";
 import { useAtom, useAtomValue } from "jotai";
 
 import { fileNameAtom, showBackgroundAtom } from "../../store";
@@ -21,7 +21,7 @@ const CloudflareFrame = () => {
 
   return (
     <div
-      className={classNames(
+      className={cn(
         sharedStyles.frame,
         showBackground && styles.frame,
         !darkMode && styles.frameLightMode,
@@ -36,7 +36,7 @@ const CloudflareFrame = () => {
         <span className={styles.gridlinesVertical} data-grid></span>
         {fileName.length > 0 ? (
           <div className={styles.header}>
-            <div className={classNames(sharedStyles.fileName, styles.fileName)} data-value={fileName}>
+            <div className={cn(sharedStyles.fileName, styles.fileName)} data-value={fileName}>
               <input
                 type="text"
                 value={fileName}
@@ -50,7 +50,7 @@ const CloudflareFrame = () => {
           </div>
         ) : flashShown ? null : (
           <div className={styles.header} data-ignore-in-export>
-            <div className={classNames(sharedStyles.fileName, styles.fileName)} data-value={fileName}>
+            <div className={cn(sharedStyles.fileName, styles.fileName)} data-value={fileName}>
               <input
                 type="text"
                 value={fileName}

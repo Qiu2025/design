@@ -29,8 +29,8 @@ import {
   MagnifyingGlassIcon,
   PlusCircleIcon,
 } from "@raycast/icons";
-import SnapBoxLogo from "@/app/assets/snapbox-logo.svg";
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/dialog";
+import DesignLogo from "@/app/assets/design-logo.svg";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/dialog";
 import { Kbd, Kbds, Shortcut } from "@/components/kbd";
 import { Input, InputSlot } from "@/components/input";
 import {
@@ -60,7 +60,7 @@ export default function Components() {
   return (
     <div className="flex flex-col gap-12 items-start p-8">
       <h1 className="text-lg font-bold flex text-nowrap items-center gap-2">
-        <SnapBoxLogo className="shrink-0 w-6 h-6" /> SnapBox Component Playground
+        <DesignLogo className="shrink-0 w-6 h-6" /> Design Component Playground
       </h1>
       <div className="flex flex-col gap-4 items-start">
         <h2 className="font-medium">Dropdown Menu</h2>
@@ -174,6 +174,7 @@ export default function Components() {
             </DialogTrigger>
             <DialogContent size="small">
               <DialogTitle>Keyboard Shortcuts</DialogTitle>
+              <DialogDescription className="sr-only">Available keyboard shortcuts.</DialogDescription>
               <div className="flex flex-col gap-3">
                 <Shortcut keys={["F"]}>Focus text editor</Shortcut>
                 <Shortcut keys={["Esc"]}>Unfocus text editor</Shortcut>
@@ -197,6 +198,7 @@ export default function Components() {
             </DialogTrigger>
             <DialogContent size="medium">
               <DialogTitle>Keyboard Shortcuts</DialogTitle>
+              <DialogDescription className="sr-only">Available keyboard shortcuts.</DialogDescription>
               <div className="flex flex-col gap-3">
                 <Shortcut keys={["F"]}>Focus text editor</Shortcut>
                 <Shortcut keys={["Esc"]}>Unfocus text editor</Shortcut>
@@ -220,6 +222,7 @@ export default function Components() {
             </DialogTrigger>
             <DialogContent size="large">
               <DialogTitle>Keyboard Shortcuts</DialogTitle>
+              <DialogDescription className="sr-only">Available keyboard shortcuts.</DialogDescription>
               <div className="flex flex-col gap-3">
                 <Shortcut keys={["F"]}>Focus text editor</Shortcut>
                 <Shortcut keys={["Esc"]}>Unfocus text editor</Shortcut>

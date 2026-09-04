@@ -1,4 +1,4 @@
-import classNames from "classnames";
+import { cn } from "@/utils/cn";
 import { useAtom, useAtomValue } from "jotai";
 import React from "react";
 
@@ -18,7 +18,7 @@ const BrowserbaseFrame = () => {
 
   return (
     <div
-      className={classNames(
+      className={cn(
         sharedStyles.frame,
         showBackground && styles.frame,
         !darkMode && styles.frameLightMode,
@@ -40,7 +40,7 @@ const BrowserbaseFrame = () => {
         </div>
       )}
       <div className={styles.window}>
-        <div className={classNames(sharedStyles.header, styles.header)}>
+        <div className={cn(sharedStyles.header, styles.header)}>
           <div className={sharedStyles.controls}>
             <div className={sharedStyles.control}></div>
             <div className={sharedStyles.control}></div>

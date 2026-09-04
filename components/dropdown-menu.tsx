@@ -6,13 +6,13 @@ import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu";
 import { CheckIcon, ChevronRightIcon, CircleIcon } from "@raycast/icons";
 import { cn } from "@/utils/cn";
 
-const DropdownMenu = DropdownMenuPrimitive.Root;
+const DropdownMenu = ({ modal = false, ...props }: DropdownMenuPrimitive.DropdownMenuProps) => {
+  return <DropdownMenuPrimitive.Root modal={modal} {...props} />;
+};
 
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger;
 
 const DropdownMenuGroup = DropdownMenuPrimitive.Group;
-
-const DropdownMenuPortal = DropdownMenuPrimitive.Portal;
 
 const DropdownMenuSub = DropdownMenuPrimitive.Sub;
 
@@ -30,7 +30,7 @@ const DropdownMenuSubTrigger = React.forwardRef<
     className={cn(
       "flex gap-2 cursor-default select-none items-center rounded px-2 py-1.5 text-sm outline-none text-gray-10 focus:bg-gray-a2 data-[state=open]:bg-accent",
       inset && "pl-8",
-      className
+      className,
     )}
     {...props}
   >
@@ -56,7 +56,7 @@ const DropdownMenuSubContent = React.forwardRef<
         data-[side=left]:animate-slideLeftAndFade
         data-[side=right]:animate-slideRightAndFade
         data-[side=top]:animate-slideUpAndFade`,
-        className
+        className,
       )}
       {...props}
     />
@@ -80,7 +80,7 @@ const DropdownMenuContent = React.forwardRef<
         data-[side=left]:animate-slideLeftAndFade
         data-[side=right]:animate-slideRightAndFade
         data-[side=top]:animate-slideUpAndFade`,
-        className
+        className,
       )}
       {...props}
     />
@@ -100,7 +100,7 @@ const DropdownMenuItem = React.forwardRef<
       `relative gap-2 flex cursor-default select-none items-center rounded px-2 py-1.5 text-sm outline-none transition-colors 
       text-gray-10 focus:bg-gray-a2 dark:focus:bg-gray-a2 focus:text-gray-11 data-[disabled]:pointer-events-none data-[disabled]:opacity-50`,
       inset && "pl-8",
-      className
+      className,
     )}
     {...props}
   />
@@ -115,7 +115,7 @@ const DropdownMenuCheckboxItem = React.forwardRef<
     ref={ref}
     className={cn(
       "text-gray-10 relative flex cursor-default select-none items-center rounded py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-gray-a2 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-      className
+      className,
     )}
     checked={checked}
     {...props}
@@ -138,7 +138,7 @@ const DropdownMenuRadioItem = React.forwardRef<
     ref={ref}
     className={cn(
       "text-gray-10 relative flex cursor-default select-none items-center rounded py-1.5 pl-8 pr-2 text-sm outline-none transition-colors focus:bg-gray-a2 data-[disabled]:pointer-events-none data-[disabled]:opacity-50 data-[state=checked]:text-gray-12",
-      className
+      className,
     )}
     {...props}
   >
@@ -174,11 +174,6 @@ const DropdownMenuSeparator = React.forwardRef<
 ));
 DropdownMenuSeparator.displayName = DropdownMenuPrimitive.Separator.displayName;
 
-const DropdownMenuShortcut = ({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) => {
-  return <span className={cn("ml-auto text-xs tracking-widest opacity-60", className)} {...props} />;
-};
-DropdownMenuShortcut.displayName = "DropdownMenuShortcut";
-
 export {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -188,9 +183,7 @@ export {
   DropdownMenuRadioItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
   DropdownMenuGroup,
-  DropdownMenuPortal,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,

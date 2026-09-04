@@ -2,40 +2,104 @@
 
 import {
   CheckCircleIcon,
+  ChevronRightIcon,
+  DownloadIcon,
   EraserIcon,
   FilmStripIcon,
   ImageIcon,
+  LockIcon,
+  MagnifyingGlassIcon,
   TrashIcon,
   UploadIcon,
-  Shield01Icon,
+  WarningIcon,
   XMarkCircleIcon,
 } from "@raycast/icons";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import { Button } from "@/components/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/dialog";
+import { Input, InputSlot } from "@/components/input";
 import { NavigationActions } from "@/components/navigation";
+import { ScrollArea } from "@/components/scroll-area";
+import { cn } from "@/utils/cn";
+import { cleanLocalImage, getLocalImageSupport, inspectLocalImage } from "@/utils/local-image-metadata";
+import { cleanLocalVideo, getLocalVideoSupport, inspectLocalVideo } from "@/utils/local-video-metadata";
 import {
   getOutputFileName,
-  isSupportedImageExtension,
-  isSupportedImageType,
   isSupportedVideoExtension,
   isSupportedVideoType,
-  MAX_VIDEO_BYTES,
+  MAX_SERVER_VIDEO_BYTES,
 } from "@/utils/media";
-import cn from "classnames";
+import {
+  getPresetSelection,
+  metadataEntryMatches,
+  serializeSelectedEntries,
+  type CleaningPreset,
+  type MetadataEntry,
+  type MetadataMode,
+  type ProcessingLocation,
+  type SelectedMetadataEntry,
+  type VerificationReport,
+} from "@/utils/metadata";
+import { InfoDialog } from "./components/InfoDialog";
 import styles from "./metadata-remover.module.css";
 
-type Mode = "image" | "video";
-type ProcessingState = "idle" | "uploading" | "processing" | "done" | "error";
-type MetadataEntry = { key: string; value: string };
+type ProcessingState = "idle" | "inspecting" | "uploading" | "processing" | "done" | "error";
+type PendingDownload = { blob: Blob; fileName: string };
+const SERVER_CONSENT_SESSION_KEY = "design.metadata.server-consent";
 
-const MIME_TO_EXPORT_TYPE: Record<string, string> = {
-  "image/jpeg": "image/jpeg",
-  "image/png": "image/png",
-  "image/webp": "image/webp",
-  "image/bmp": "image/png",
-  "image/gif": "image/png",
-  "image/tiff": "image/png",
-  "image/svg+xml": "image/png",
+const IMAGE_ACCEPT =
+  ".jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.svg,image/jpeg,image/png,image/webp,image/gif,image/bmp,image/tiff,image/svg+xml";
+const VIDEO_ACCEPT =
+  ".mp4,.mov,.webm,.mkv,.avi,.flv,.3gp,.ts,.mpg,.mpeg,.ogv,video/mp4,video/quicktime,video/webm,video/x-matroska,video/x-msvideo,video/x-flv,video/3gpp,video/mp2t,video/mpeg,video/ogg";
+const PROTECTED_METADATA_GROUP = "Required for playback or display";
+const TECHNICAL_METADATA_GROUPS = new Set(["Technical metadata", "Container and track metadata"]);
+
+const getMetadataGroupRank = (group: string) => {
+  if (group === PROTECTED_METADATA_GROUP) return 2;
+  if (TECHNICAL_METADATA_GROUPS.has(group)) return 1;
+  return 0;
+};
+
+const compareMetadataGroups = (left: string, right: string) => {
+  return getMetadataGroupRank(left) - getMetadataGroupRank(right) || left.localeCompare(right);
+};
+
+const normalizeMetadataLabel = (label: string) => label.trim().toLowerCase();
+
+const waitForInspectionPaint = () =>
+  new Promise<void>((resolve) => {
+    if (document.visibilityState !== "visible") {
+      resolve();
+      return;
+    }
+
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const fallback = window.setTimeout(finish, 64);
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        window.clearTimeout(fallback);
+        finish();
+      });
+    });
+  });
+
+const formatBytes = (value: number) => {
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
 };
 
 const downloadBlob = (blob: Blob, fileName: string) => {
@@ -43,532 +107,1046 @@ const downloadBlob = (blob: Blob, fileName: string) => {
   const link = document.createElement("a");
   link.href = url;
   link.download = fileName;
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 };
 
-const formatBytes = (value: number) => {
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-  const mb = value / (1024 * 1024);
-  if (mb < 1024) return `${mb.toFixed(1)} MB`;
-  return `${(mb / 1024).toFixed(2)} GB`;
+const getErrorMessage = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
+
+const decodeServerVerification = (encoded: string | null): SelectedMetadataEntry[] => {
+  if (!encoded) return [];
+
+  try {
+    const base64 = encoded
+      .replace(/-/g, "+")
+      .replace(/_/g, "/")
+      .padEnd(Math.ceil(encoded.length / 4) * 4, "=");
+    return JSON.parse(atob(base64)) as SelectedMetadataEntry[];
+  } catch {
+    throw new Error("The server returned an unreadable verification report.");
+  }
 };
 
-/* ── Lightweight EXIF parser (client-side, no deps) ── */
-function readExifFromFile(file: File): Promise<MetadataEntry[]> {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const entries: MetadataEntry[] = [];
-      try {
-        const view = new DataView(reader.result as ArrayBuffer);
-        if (view.getUint16(0) !== 0xffd8) {
-          resolve([]);
-          return;
-        }
-        let offset = 2;
-        while (offset < view.byteLength - 1) {
-          const marker = view.getUint16(offset);
-          if (marker === 0xffe1) {
-            const length = view.getUint16(offset + 2);
-            const exifBlock = new Uint8Array(reader.result as ArrayBuffer, offset + 4, length - 2);
-            const str = new TextDecoder("latin1").decode(exifBlock);
-            if (str.startsWith("Exif")) {
-              const tiffOffset = offset + 10;
-              const littleEndian = view.getUint16(tiffOffset) === 0x4949;
-              const ifdOffset = view.getUint32(tiffOffset + 4, littleEndian);
-              const ifdStart = tiffOffset + ifdOffset;
-              if (ifdStart + 2 < view.byteLength) {
-                const count = view.getUint16(ifdStart, littleEndian);
-                for (let i = 0; i < count && ifdStart + 2 + i * 12 + 12 <= view.byteLength; i++) {
-                  const entryOffset = ifdStart + 2 + i * 12;
-                  const tag = view.getUint16(entryOffset, littleEndian);
-                  const type = view.getUint16(entryOffset + 2, littleEndian);
-                  const numValues = view.getUint32(entryOffset + 4, littleEndian);
-                  let val = "";
-                  if (type === 3) val = String(view.getUint16(entryOffset + 8, littleEndian));
-                  else if (type === 4) val = String(view.getUint32(entryOffset + 8, littleEndian));
-                  else if (type === 2) {
-                    const strLen = numValues;
-                    const valueOffset =
-                      strLen <= 4 ? entryOffset + 8 : tiffOffset + view.getUint32(entryOffset + 8, littleEndian);
-                    if (valueOffset + strLen <= view.byteLength) {
-                      const bytes = new Uint8Array(reader.result as ArrayBuffer, valueOffset, strLen);
-                      val = new TextDecoder("latin1").decode(bytes).replace(/\0/g, "").trim();
-                    }
-                  } else if (type === 5 && numValues === 1) {
-                    const rOff = tiffOffset + view.getUint32(entryOffset + 8, littleEndian);
-                    if (rOff + 8 <= view.byteLength) {
-                      const num = view.getUint32(rOff, littleEndian);
-                      const den = view.getUint32(rOff + 4, littleEndian);
-                      val = den ? `${num}/${den}` : String(num);
-                    }
-                  }
-                  if (val) entries.push({ key: tagName(tag), value: val });
-                }
-              }
-            }
-            break;
-          }
-          if ((marker & 0xff00) !== 0xff00) break;
-          offset += 2 + view.getUint16(offset + 2);
-        }
-      } catch {
-        /* parsing failed — return what we have */
-      }
-      resolve(entries);
-    };
-    reader.onerror = () => resolve([]);
-    reader.readAsArrayBuffer(file.slice(0, 128 * 1024));
-  });
-}
-
-const EXIF_TAGS: Record<number, string> = {
-  0x010f: "Camera Make",
-  0x0110: "Camera Model",
-  0x0112: "Orientation",
-  0x011a: "X Resolution",
-  0x011b: "Y Resolution",
-  0x0128: "Resolution Unit",
-  0x0131: "Software",
-  0x0132: "Date/Time",
-  0x013b: "Artist",
-  0x8298: "Copyright",
-  0x8769: "Exif IFD",
-  0x8825: "GPS IFD",
-  0x0100: "Image Width",
-  0x0101: "Image Height",
-  0x0102: "Bits/Sample",
-  0x0103: "Compression",
-  0x0106: "Photometric Interp.",
-  0x010e: "Image Description",
-  0x0201: "JPEG Offset",
-  0x0202: "JPEG Length",
-  0xa002: "Pixel X Dimension",
-  0xa003: "Pixel Y Dimension",
-  0x9003: "Date Original",
-  0x9004: "Date Digitized",
-  0x829a: "Exposure Time",
-  0x829d: "F-Number",
-  0x9207: "Metering Mode",
-  0x920a: "Focal Length",
-  0xa405: "Focal Length (35mm)",
-};
-function tagName(tag: number) {
-  return EXIF_TAGS[tag] || `Tag 0x${tag.toString(16).toUpperCase()}`;
-}
-
-/* ── Component ── */
 export function MetadataRemover() {
-  const [mode, setMode] = useState<Mode>("image");
+  const [mode, setMode] = useState<MetadataMode>("image");
+  const [processingLocation, setProcessingLocation] = useState<ProcessingLocation>("local");
+  const [serverConsentGranted, setServerConsentGranted] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.sessionStorage.getItem(SERVER_CONSENT_SESSION_KEY) === "granted";
+    } catch {
+      return false;
+    }
+  });
   const [file, setFile] = useState<File | null>(null);
   const [processingState, setProcessingState] = useState<ProcessingState>("idle");
-  const [quality, setQuality] = useState(92);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [progress, setProgress] = useState(0);
   const [metadataEntries, setMetadataEntries] = useState<MetadataEntry[]>([]);
-  const [metadataLoading, setMetadataLoading] = useState(false);
+  const [selectedMetadata, setSelectedMetadata] = useState<Set<string>>(new Set());
+  const [metadataError, setMetadataError] = useState<string | null>(null);
+  const [metadataQuery, setMetadataQuery] = useState("");
+  const [preset, setPreset] = useState<CleaningPreset>("safe");
+  const [activeGroup, setActiveGroup] = useState<string | null>(null);
+  const [inspectionComplete, setInspectionComplete] = useState(false);
+  const [report, setReport] = useState<VerificationReport | null>(null);
+  const [pendingDownload, setPendingDownload] = useState<PendingDownload | null>(null);
+  const [preserveWorkbenchDuringInspection, setPreserveWorkbenchDuringInspection] = useState(false);
+  const [inspectionRevision, setInspectionRevision] = useState(0);
+  const [serverConsentOpen, setServerConsentOpen] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
+  const serverConsentResolverRef = useRef<((granted: boolean) => void) | null>(null);
+  const serverConsentPromiseRef = useRef<Promise<boolean> | null>(null);
+  const inspectionRequestRef = useRef(0);
+  const isBusy =
+    processingState === "inspecting" || processingState === "uploading" || processingState === "processing";
+  const selectedCount = selectedMetadata.size;
+  const removableEntries = useMemo(() => metadataEntries.filter((entry) => !entry.protected), [metadataEntries]);
+  const protectedCount = metadataEntries.length - removableEntries.length;
+  const serverTooLarge = Boolean(file && file.size > MAX_SERVER_VIDEO_BYTES);
+  const duplicateMetadataLabels = useMemo(() => {
+    const counts = new Map<string, number>();
+    metadataEntries.forEach((entry) => {
+      const label = normalizeMetadataLabel(entry.label);
+      counts.set(label, (counts.get(label) || 0) + 1);
+    });
+    return new Set(
+      Array.from(counts.entries())
+        .filter(([, count]) => count > 1)
+        .map(([label]) => label),
+    );
+  }, [metadataEntries]);
 
-  const qualityValue = useMemo(() => quality / 100, [quality]);
-  const isLossy = file ? file.type === "image/jpeg" || file.type === "image/webp" : false;
-  const isProcessing = processingState === "uploading" || processingState === "processing";
+  const filteredEntries = useMemo(() => {
+    const query = metadataQuery.trim().toLowerCase();
+    if (!query) return metadataEntries;
+    return metadataEntries.filter((entry) => {
+      const searchableValues = [entry.label, entry.value, entry.group];
+      if (duplicateMetadataLabels.has(normalizeMetadataLabel(entry.label))) searchableValues.push(entry.sourceLabel);
+      return searchableValues.some((value) => value.toLowerCase().includes(query));
+    });
+  }, [duplicateMetadataLabels, metadataEntries, metadataQuery]);
 
-  const resetFeedback = useCallback(() => {
+  const groupedEntries = useMemo(() => {
+    const groups = new Map<string, MetadataEntry[]>();
+    filteredEntries.forEach((entry) => groups.set(entry.group, [...(groups.get(entry.group) || []), entry]));
+    return Array.from(groups.entries()).sort((a, b) => compareMetadataGroups(a[0], b[0]));
+  }, [filteredEntries]);
+
+  const metadataGroups = useMemo(() => {
+    const groups = new Map<string, MetadataEntry[]>();
+    metadataEntries.forEach((entry) => groups.set(entry.group, [...(groups.get(entry.group) || []), entry]));
+    return Array.from(groups.entries()).sort((a, b) => compareMetadataGroups(a[0], b[0]));
+  }, [metadataEntries]);
+
+  const visibleGroups = useMemo(() => {
+    if (metadataQuery.trim()) return groupedEntries;
+    const selectedGroup = metadataGroups.find(([group]) => group === activeGroup);
+    return selectedGroup ? [selectedGroup] : metadataGroups.slice(0, 1);
+  }, [activeGroup, groupedEntries, metadataGroups, metadataQuery]);
+
+  const clearInspection = useCallback((preserveWorkbench = false) => {
+    inspectionRequestRef.current += 1;
+    setMetadataEntries([]);
+    setSelectedMetadata(new Set());
+    setMetadataError(null);
+    setMetadataQuery("");
+    setPreset("safe");
+    setActiveGroup(null);
+    setInspectionComplete(false);
+    setReport(null);
+    setPendingDownload(null);
+    setProgress(0);
     setMessage(null);
     setError(null);
+    setProcessingState("idle");
+    setPreserveWorkbenchDuringInspection(preserveWorkbench);
   }, []);
 
-  const resetAll = useCallback(() => {
+  useEffect(
+    () => () => {
+      inspectionRequestRef.current += 1;
+    },
+    [],
+  );
+
+  const applyInspectedEntries = useCallback((entries: MetadataEntry[]) => {
+    setMetadataEntries(entries);
+    setSelectedMetadata(getPresetSelection(entries, "safe"));
+    setPreset("safe");
+    setActiveGroup(Array.from(new Set(entries.map((entry) => entry.group))).sort(compareMetadataGroups)[0] || null);
+    setInspectionComplete(true);
+    setReport(null);
+    setPendingDownload(null);
+    setPreserveWorkbenchDuringInspection(false);
+    setInspectionRevision((revision) => revision + 1);
+  }, []);
+
+  const inspectOnDevice = useCallback(
+    async (nextFile: File, nextMode: MetadataMode) => {
+      const requestId = ++inspectionRequestRef.current;
+      setProcessingState("inspecting");
+      setMetadataError(null);
+      setError(null);
+      await waitForInspectionPaint();
+      if (requestId !== inspectionRequestRef.current) return;
+
+      try {
+        let entries: MetadataEntry[];
+        if (nextMode === "image") {
+          const support = getLocalImageSupport(nextFile);
+          if (!support.supported) throw new Error(support.reason || "This image format is not supported.");
+          entries = await inspectLocalImage(nextFile);
+          if (requestId !== inspectionRequestRef.current) return;
+          if (!support.guaranteed && support.reason) setMessage(support.reason);
+        } else {
+          const support = getLocalVideoSupport(nextFile);
+          if (!support.supported) throw new Error(support.reason || "This video cannot be processed on this device.");
+          entries = await inspectLocalVideo(nextFile);
+          if (requestId !== inspectionRequestRef.current) return;
+        }
+        applyInspectedEntries(entries);
+        setProcessingState("idle");
+      } catch (inspectionError) {
+        if (requestId !== inspectionRequestRef.current) return;
+        setMetadataEntries([]);
+        setSelectedMetadata(new Set());
+        setMetadataError(getErrorMessage(inspectionError, "The file could not be inspected on this device."));
+        setProcessingState("error");
+        setPreserveWorkbenchDuringInspection(false);
+      }
+    },
+    [applyInspectedEntries],
+  );
+
+  const setSelectedFile = useCallback(
+    (nextFile: File | null) => {
+      const shouldPreserveWorkbench = Boolean(
+        nextFile &&
+          (mode === "image" || processingLocation === "local") &&
+          (metadataEntries.length > 0 || report !== null || pendingDownload !== null),
+      );
+      clearInspection(shouldPreserveWorkbench);
+      setFile(nextFile);
+      if (!nextFile) return;
+
+      if (mode === "video" && !isSupportedVideoType(nextFile.type) && !isSupportedVideoExtension(nextFile.name)) {
+        setMetadataError("This video format is not supported locally or by the server.");
+        setProcessingState("error");
+        setPreserveWorkbenchDuringInspection(false);
+        return;
+      }
+
+      if (mode === "image" || processingLocation === "local") {
+        void inspectOnDevice(nextFile, mode);
+      }
+    },
+    [clearInspection, inspectOnDevice, metadataEntries.length, mode, pendingDownload, processingLocation, report],
+  );
+
+  const changeMode = (nextMode: MetadataMode) => {
+    if (nextMode === mode) return;
+    setMode(nextMode);
+    setProcessingLocation("local");
     setFile(null);
-    setProcessingState("idle");
-    setUploadProgress(0);
-    setMetadataEntries([]);
-    setMetadataLoading(false);
-    resetFeedback();
-  }, [resetFeedback]);
-
-  /* Auto-read EXIF when an image file is selected */
-  useEffect(() => {
-    if (!file || mode !== "image") {
-      setMetadataEntries([]);
-      return;
-    }
-    if (file.type !== "image/jpeg") {
-      setMetadataEntries([]);
-      return;
-    }
-    setMetadataLoading(true);
-    readExifFromFile(file).then((entries) => {
-      setMetadataEntries(entries);
-      setMetadataLoading(false);
-    });
-  }, [file, mode]);
-
-  const onFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0] || null;
-    resetFeedback();
-    setProcessingState("idle");
-    setFile(f);
-  };
-
-  const onDragEnter = (e: DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragging(true);
-  };
-  const onDragOver = (e: DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-  };
-  const onDragLeave = (e: DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (dropZoneRef.current && !dropZoneRef.current.contains(e.relatedTarget as Node)) setDragging(false);
-  };
-  const onDrop = (e: DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragging(false);
-    resetFeedback();
-    setProcessingState("idle");
-    const f = e.dataTransfer?.files?.[0] || null;
-    if (f) setFile(f);
-  };
-  const onRemoveFile = () => {
-    resetAll();
+    clearInspection();
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  const validateImageFile = (f: File) => isSupportedImageType(f.type) || isSupportedImageExtension(f.name);
-  const validateVideoFile = (f: File) => isSupportedVideoType(f.type) || isSupportedVideoExtension(f.name);
+  const changeProcessingLocation = (nextLocation: ProcessingLocation) => {
+    if (nextLocation === processingLocation) return;
+    setProcessingLocation(nextLocation);
+    clearInspection();
 
-  const removeImageMetadata = async () => {
-    if (!file) {
-      setError("Select an image file first.");
-      return;
-    }
-    if (!validateImageFile(file)) {
-      setError("Unsupported image format.");
-      return;
-    }
-    setProcessingState("processing");
-    resetFeedback();
-    try {
-      const dataUrl = await new Promise<string>((res, rej) => {
-        const r = new FileReader();
-        r.onload = () => res(String(r.result));
-        r.onerror = () => rej(new Error("Read failed"));
-        r.readAsDataURL(file);
-      });
-      const img = await new Promise<HTMLImageElement>((res, rej) => {
-        const i = new Image();
-        i.onload = () => res(i);
-        i.onerror = () => rej(new Error("Decode failed"));
-        i.src = dataUrl;
-      });
-      const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Canvas failed");
-      ctx.drawImage(img, 0, 0);
-      const exportType = MIME_TO_EXPORT_TYPE[file.type] || "image/png";
-      const qp = exportType === "image/jpeg" || exportType === "image/webp" ? qualityValue : undefined;
-      const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, exportType, qp));
-      if (!blob) throw new Error("Export failed");
-      downloadBlob(blob, getOutputFileName(file.name, "clean"));
-      setProcessingState("done");
-      setMessage("Image exported without metadata.");
-    } catch (err) {
-      setProcessingState("error");
-      setError(`Image processing failed: ${err instanceof Error ? err.message : "Unknown error"}`);
+    if (file && nextLocation === "local") {
+      void inspectOnDevice(file, "video");
     }
   };
 
-  const removeVideoMetadata = async () => {
-    if (!file) {
-      setError("Select a video file first.");
+  const settleServerConsent = (granted: boolean) => {
+    const resolve = serverConsentResolverRef.current;
+    serverConsentResolverRef.current = null;
+    serverConsentPromiseRef.current = null;
+
+    if (granted) {
+      setServerConsentGranted(true);
+      try {
+        window.sessionStorage.setItem(SERVER_CONSENT_SESSION_KEY, "granted");
+      } catch {
+        // In-memory consent still applies when session storage is unavailable.
+      }
+    }
+    setServerConsentOpen(false);
+    resolve?.(granted);
+  };
+
+  const requestServerConsent = () => {
+    if (serverConsentGranted) return Promise.resolve(true);
+    if (serverConsentPromiseRef.current) return serverConsentPromiseRef.current;
+
+    const request = new Promise<boolean>((resolve) => {
+      serverConsentResolverRef.current = resolve;
+    });
+    serverConsentPromiseRef.current = request;
+    setServerConsentOpen(true);
+    return request;
+  };
+
+  const inspectOnServer = async () => {
+    if (!file || mode !== "video" || processingLocation !== "server") return;
+    if (serverTooLarge) {
+      setMetadataError("This video exceeds the 250 MB server limit and will not be uploaded.");
       return;
     }
-    if (!validateVideoFile(file)) {
-      setError("Unsupported video format.");
-      return;
-    }
-    if (file.size > MAX_VIDEO_BYTES) {
-      setError(`File exceeds ${formatBytes(MAX_VIDEO_BYTES)} limit.`);
-      return;
-    }
+    const requestId = ++inspectionRequestRef.current;
+    if (!(await requestServerConsent()) || requestId !== inspectionRequestRef.current) return;
+
     setProcessingState("uploading");
-    setUploadProgress(0);
-    resetFeedback();
+    setMetadataError(null);
+    setError(null);
+
     try {
       const formData = new FormData();
       formData.set("file", file);
-      const { blob, fileName } = await new Promise<{ blob: Blob; fileName: string }>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.upload.addEventListener("progress", (ev) => {
-          if (ev.lengthComputable) {
-            const pct = Math.round((ev.loaded / ev.total) * 100);
-            setUploadProgress(pct);
-            if (pct >= 100) setProcessingState("processing");
-          }
-        });
-        xhr.addEventListener("load", () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve({
-              blob: xhr.response as Blob,
-              fileName: xhr.getResponseHeader("X-Output-File") || getOutputFileName(file.name, "clean"),
-            });
-          } else {
-            const r = new FileReader();
-            r.onload = () => {
-              try {
-                reject(new Error(JSON.parse(r.result as string)?.error || "Unknown"));
-              } catch {
-                reject(new Error("Unknown"));
-              }
-            };
-            r.onerror = () => reject(new Error("Unknown"));
-            r.readAsText(xhr.response);
-          }
-        });
-        xhr.addEventListener("error", () => reject(new Error("Network error.")));
-        xhr.addEventListener("timeout", () => reject(new Error("Request timed out.")));
-        xhr.open("POST", "/api/remove-video-metadata");
-        xhr.responseType = "blob";
-        xhr.timeout = 180_000;
-        xhr.send(formData);
-      });
-      downloadBlob(blob, fileName);
-      setProcessingState("done");
-      setMessage("Video processed — metadata removed.");
-    } catch (err) {
+      const response = await fetch("/api/metadata/inspect", { method: "POST", body: formData });
+      const payload = (await response.json()) as { entries?: MetadataEntry[]; error?: string };
+      if (requestId !== inspectionRequestRef.current) return;
+      if (!response.ok || !payload.entries)
+        throw new Error(payload.error || "The server could not inspect this video.");
+      applyInspectedEntries(payload.entries);
+      setProcessingState("idle");
+    } catch (inspectionError) {
+      if (requestId !== inspectionRequestRef.current) return;
+      setMetadataEntries([]);
+      setSelectedMetadata(new Set());
+      setMetadataError(getErrorMessage(inspectionError, "The server could not inspect this video."));
       setProcessingState("error");
-      setError(`Video processing failed: ${err instanceof Error ? err.message : "Unknown error"}`);
+      setPreserveWorkbenchDuringInspection(false);
     }
   };
 
-  const imageAccept =
-    ".jpg,.jpeg,.png,.webp,.gif,.bmp,.tiff,.tif,.svg,image/jpeg,image/png,image/webp,image/gif,image/bmp,image/tiff,image/svg+xml";
-  const videoAccept =
-    ".mp4,.mov,.webm,.mkv,.avi,.flv,.3gp,.ts,.mpg,.mpeg,.ogv,video/mp4,video/quicktime,video/webm,video/x-matroska,video/x-msvideo,video/x-flv,video/3gpp,video/mp2t,video/mpeg,video/ogg";
-  const accept = mode === "image" ? imageAccept : videoAccept;
-  const supportedFormats =
-    mode === "image" ? "JPG, PNG, WebP, GIF, BMP, TIFF, SVG" : "MP4, MOV, WebM, MKV, AVI, FLV, 3GP, TS, MPEG, OGV";
+  const applyPreset = (nextPreset: Exclude<CleaningPreset, "custom">) => {
+    setPreset(nextPreset);
+    setSelectedMetadata(getPresetSelection(metadataEntries, nextPreset));
+    setReport(null);
+    setPendingDownload(null);
+    setMessage(null);
+  };
+
+  const toggleMetadataSelection = (entry: MetadataEntry) => {
+    if (entry.protected) return;
+    setPreset("custom");
+    setReport(null);
+    setPendingDownload(null);
+    setMessage(null);
+    setSelectedMetadata((previous) => {
+      const next = new Set(previous);
+      if (next.has(entry.id)) next.delete(entry.id);
+      else next.add(entry.id);
+      return next;
+    });
+  };
+
+  const selectGroup = (entries: MetadataEntry[], selected: boolean) => {
+    setPreset("custom");
+    setReport(null);
+    setPendingDownload(null);
+    setMessage(null);
+    setSelectedMetadata((previous) => {
+      const next = new Set(previous);
+      entries
+        .filter((entry) => !entry.protected)
+        .forEach((entry) => (selected ? next.add(entry.id) : next.delete(entry.id)));
+      return next;
+    });
+  };
+
+  const finishCleaning = (result: PendingDownload & { report: VerificationReport }) => {
+    setReport(result.report);
+    setProcessingState("done");
+    setProgress(100);
+
+    if (result.report.unresolved.length > 0) {
+      setPendingDownload({ blob: result.blob, fileName: result.fileName });
+      setMessage(null);
+      return;
+    }
+
+    setPendingDownload(null);
+    downloadBlob(result.blob, result.fileName);
+    setMessage("Verified: no selected fields remain among the metadata fields Design can detect.");
+  };
+
+  const cleanOnServer = async (selectedEntries: MetadataEntry[]) => {
+    if (!file) return;
+    if (serverTooLarge) throw new Error("This video exceeds the 250 MB server limit and will not be uploaded.");
+    if (!(await requestServerConsent())) return;
+
+    setProcessingState("uploading");
+    setProgress(0);
+    const formData = new FormData();
+    formData.set("file", file);
+    formData.set("selected", JSON.stringify(serializeSelectedEntries(selectedEntries)));
+
+    const result = await new Promise<PendingDownload & { report: VerificationReport }>((resolve, reject) => {
+      const request = new XMLHttpRequest();
+      request.upload.addEventListener("progress", (event) => {
+        if (!event.lengthComputable) return;
+        const uploadProgress = Math.round((event.loaded / event.total) * 100);
+        setProgress(uploadProgress);
+        if (uploadProgress >= 100) setProcessingState("processing");
+      });
+      request.addEventListener("load", () => {
+        if (request.status < 200 || request.status >= 300) {
+          request.response.text().then((body: string) => {
+            try {
+              reject(
+                new Error((JSON.parse(body) as { error?: string }).error || "The server could not clean this video."),
+              );
+            } catch {
+              reject(new Error("The server could not clean this video."));
+            }
+          });
+          return;
+        }
+
+        try {
+          const unresolvedSelection = decodeServerVerification(request.getResponseHeader("X-Metadata-Verification"));
+          const unresolved = selectedEntries.filter((entry) =>
+            unresolvedSelection.some((candidate) => metadataEntryMatches(entry, candidate)),
+          );
+          const unresolvedIds = new Set(unresolved.map((entry) => entry.id));
+          const outputHeader = request.getResponseHeader("X-Output-File");
+          resolve({
+            blob: request.response as Blob,
+            fileName: outputHeader ? decodeURIComponent(outputHeader) : getOutputFileName(file.name, "clean"),
+            report: {
+              removed: selectedEntries.filter((entry) => !unresolvedIds.has(entry.id)),
+              notSelected: metadataEntries.filter((entry) => !selectedMetadata.has(entry.id)),
+              unresolved,
+            },
+          });
+        } catch (responseError) {
+          reject(responseError);
+        }
+      });
+      request.addEventListener("error", () => reject(new Error("The upload failed because of a network error.")));
+      request.addEventListener("timeout", () => reject(new Error("Server processing timed out.")));
+      request.open("POST", "/api/metadata/remove");
+      request.responseType = "blob";
+      request.timeout = 180_000;
+      request.send(formData);
+    });
+
+    finishCleaning(result);
+  };
+
+  const removeSelectedMetadata = async () => {
+    if (!file || selectedCount === 0) return;
+    const selectedEntries = metadataEntries.filter((entry) => selectedMetadata.has(entry.id) && !entry.protected);
+    if (selectedEntries.length === 0) return;
+
+    setError(null);
+    setMessage(null);
+    setReport(null);
+    setPendingDownload(null);
+
+    try {
+      if (mode === "video" && processingLocation === "server") {
+        await cleanOnServer(selectedEntries);
+        return;
+      }
+
+      setProcessingState("processing");
+      setProgress(0);
+      const result =
+        mode === "image"
+          ? await cleanLocalImage(file, metadataEntries, selectedMetadata)
+          : await cleanLocalVideo(file, metadataEntries, selectedMetadata, setProgress);
+      finishCleaning(result);
+    } catch (processingError) {
+      setProcessingState("error");
+      setError(getErrorMessage(processingError, "The file could not be cleaned without altering it."));
+    }
+  };
+
+  const onFileChange = (event: ChangeEvent<HTMLInputElement>) => setSelectedFile(event.target.files?.[0] || null);
+  const onDrop = (event: DragEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setDragging(false);
+    if (isBusy) return;
+    const droppedFile = event.dataTransfer.files?.[0];
+    if (droppedFile) setSelectedFile(droppedFile);
+  };
+
+  const removeFile = () => {
+    setFile(null);
+    clearInspection();
+    if (inputRef.current) inputRef.current.value = "";
+  };
+
+  const hasNothingToClean =
+    file &&
+    inspectionComplete &&
+    !isBusy &&
+    !metadataError &&
+    metadataEntries.length > 0 &&
+    removableEntries.length === 0;
+  const hasNoDetectedMetadata = file && inspectionComplete && !isBusy && !metadataError && metadataEntries.length === 0;
+  const waitingForServerInspection = Boolean(
+    file && mode === "video" && processingLocation === "server" && !inspectionComplete && !metadataError && !isBusy,
+  );
+  const showWorkbench =
+    metadataEntries.length > 0 ||
+    report !== null ||
+    pendingDownload !== null ||
+    (preserveWorkbenchDuringInspection && isBusy);
+  const isCleaning = isBusy && metadataEntries.length > 0;
 
   return (
     <>
+      <Dialog
+        open={serverConsentOpen}
+        onOpenChange={(open) => {
+          if (open) setServerConsentOpen(true);
+          else settleServerConsent(false);
+        }}
+      >
+        <DialogContent size="medium">
+          <DialogHeader>
+            <DialogTitle>Upload this video?</DialogTitle>
+            <DialogDescription>
+              The file will be temporarily uploaded for server processing and deleted afterward. This choice is
+              remembered only for this browser session.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => settleServerConsent(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" onClick={() => settleServerConsent(true)}>
+              Continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <NavigationActions>
+        <InfoDialog />
         <Button
-          onClick={mode === "image" ? removeImageMetadata : removeVideoMetadata}
-          disabled={isProcessing || !file}
+          onClick={removeSelectedMetadata}
+          disabled={isBusy || !file || selectedCount === 0 || (processingLocation === "server" && serverTooLarge)}
           variant="primary"
+          className={styles.cleanButton}
+          aria-label={isCleaning ? "Cleaning file" : "Clean file"}
+          aria-busy={isCleaning}
         >
           <EraserIcon className="h-4 w-4" />
-          {isProcessing ? "Processing…" : "Remove Metadata"}
+          <span className={styles.cleanButtonLabel}>Clean file</span>
         </Button>
       </NavigationActions>
 
-      <div className={styles.container}>
-        <header className={styles.header}>
-          <h1 className={styles.title}>Remove metadata from your files</h1>
-          <p className={styles.subtitle}>
-            Strip EXIF, XMP, IPTC and other embedded metadata for privacy. Choose between image and video processing
-            below.
-          </p>
-        </header>
-
-        {/* Mode toggle */}
-        <div className={styles.modeToggle}>
-          <button
-            type="button"
-            onClick={() => {
-              setMode("image");
-              resetAll();
-            }}
-            className={cn(styles.modeButton, mode === "image" && styles.modeButtonActive)}
-          >
-            <ImageIcon className="h-4 w-4" /> Image
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode("video");
-              resetAll();
-            }}
-            className={cn(styles.modeButton, mode === "video" && styles.modeButtonActive)}
-          >
-            <FilmStripIcon className="h-4 w-4" /> Video
-          </button>
-        </div>
-
-        {/* Drop zone */}
-        {!isProcessing && (
-          <div
-            ref={dropZoneRef}
-            className={cn(styles.dropZone, dragging && styles.dropZoneDragging, file && styles.dropZoneHasFile)}
-            onDragEnter={onDragEnter}
-            onDragOver={onDragOver}
-            onDragLeave={onDragLeave}
-            onDrop={onDrop}
-          >
-            <input
-              ref={inputRef}
-              type="file"
-              accept={accept}
-              onChange={onFileChange}
-              className={styles.hiddenInput}
-              id="metadata-file-input"
-            />
-            {!file ? (
-              <>
-                <div className={styles.dropZoneIcon}>
-                  <UploadIcon className="h-6 w-6" />
+      <main className={styles.container}>
+        <h1 className={styles.visuallyHidden}>Metadata remover</h1>
+        <div className={cn(styles.workspace, showWorkbench ? styles.workspaceWorkbench : styles.workspaceSetup)}>
+          <aside className={styles.workflowPanel} aria-labelledby="file-panel-title">
+            <div className={styles.workflowControls}>
+              <div className={styles.panelHeading}>
+                <h2 id="file-panel-title">File</h2>
+                <div className={styles.modeToggle} role="group" aria-label="File type">
+                  <button
+                    type="button"
+                    onClick={() => changeMode("image")}
+                    className={cn(styles.modeButton, mode === "image" && styles.modeButtonActive)}
+                    aria-pressed={mode === "image"}
+                    disabled={isBusy}
+                  >
+                    <ImageIcon className="h-4 w-4" /> Image
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => changeMode("video")}
+                    className={cn(styles.modeButton, mode === "video" && styles.modeButtonActive)}
+                    aria-pressed={mode === "video"}
+                    disabled={isBusy}
+                  >
+                    <FilmStripIcon className="h-4 w-4" /> Video
+                  </button>
                 </div>
-                <p className={styles.dropZoneLabel}>
-                  Drop your {mode} here or <span className="text-brand">browse</span>
-                </p>
-                <p className={styles.dropZoneHint}>Click or drag a file to get started</p>
-                <p className={styles.dropZoneAccept}>Supports {supportedFormats}</p>
-              </>
-            ) : (
-              <>
-                <div className={styles.dropZoneIcon}>
-                  {mode === "image" ? <ImageIcon className="h-6 w-6" /> : <FilmStripIcon className="h-6 w-6" />}
-                </div>
-                <p className={styles.dropZoneLabel}>File ready</p>
-                <p className={styles.dropZoneHint}>Click &ldquo;Remove Metadata&rdquo; in the top right to process</p>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* Processing state */}
-        {isProcessing && (
-          <div className={cn(styles.dropZone, styles.dropZoneHasFile)}>
-            <div className={styles.processingOverlay}>
-              <div className={styles.spinner} />
-              <p className={styles.processingText}>{processingState === "uploading" ? "Uploading…" : "Processing…"}</p>
-              <p className={styles.processingHint}>
-                {processingState === "uploading"
-                  ? "Sending file to server"
-                  : mode === "image"
-                    ? "Stripping metadata locally"
-                    : "Server is removing metadata"}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* File preview */}
-        {file && !isProcessing && (
-          <div className={styles.filePreview}>
-            <div className={styles.fileIconWrapper}>
-              {mode === "image" ? <ImageIcon className="h-5 w-5" /> : <FilmStripIcon className="h-5 w-5" />}
-            </div>
-            <div className={styles.fileInfo}>
-              <p className={styles.fileName}>{file.name}</p>
-              <p className={styles.fileSize}>{formatBytes(file.size)}</p>
-            </div>
-            <button type="button" className={styles.fileRemove} onClick={onRemoveFile} aria-label="Remove file">
-              <TrashIcon className="h-4 w-4" />
-            </button>
-          </div>
-        )}
-
-        {/* Metadata preview for JPEG images */}
-        {file && !isProcessing && mode === "image" && (metadataLoading || metadataEntries.length > 0) && (
-          <div className={styles.metadataPreview}>
-            <p className={styles.metadataTitle}>Detected metadata</p>
-            {metadataLoading ? (
-              <p className={styles.metadataHint}>Reading…</p>
-            ) : (
-              <div className={styles.metadataList}>
-                {metadataEntries.map((entry, i) => (
-                  <div key={i} className={styles.metadataRow}>
-                    <span className={styles.metadataKey}>{entry.key}</span>
-                    <span className={styles.metadataValue}>{entry.value}</span>
-                  </div>
-                ))}
               </div>
-            )}
-            <p className={styles.metadataHint}>All detected metadata will be stripped on export.</p>
-          </div>
-        )}
 
-        {file &&
-          !isProcessing &&
-          mode === "image" &&
-          !metadataLoading &&
-          metadataEntries.length === 0 &&
-          file.type === "image/jpeg" && (
-            <div className={styles.metadataPreview}>
-              <p className={styles.metadataTitle}>No EXIF metadata detected</p>
-              <p className={styles.metadataHint}>
-                This image may already be clean, or uses non-EXIF metadata that will still be stripped.
-              </p>
+              {mode === "video" && (
+                <div className={styles.controlBlock}>
+                  <span className={styles.controlLabel}>Processing</span>
+                  <div className={styles.processingChooser} role="group" aria-label="Video processing location">
+                    <button
+                      type="button"
+                      className={cn(
+                        styles.processingOption,
+                        processingLocation === "local" && styles.processingOptionActive,
+                      )}
+                      onClick={() => changeProcessingLocation("local")}
+                      aria-pressed={processingLocation === "local"}
+                      disabled={isBusy}
+                    >
+                      On device
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(
+                        styles.processingOption,
+                        processingLocation === "server" && styles.processingOptionActive,
+                        processingLocation === "local" &&
+                          metadataError &&
+                          file &&
+                          file.size <= MAX_SERVER_VIDEO_BYTES &&
+                          (isSupportedVideoType(file.type) || isSupportedVideoExtension(file.name)) &&
+                          styles.processingOptionSuggested,
+                      )}
+                      onClick={() => changeProcessingLocation("server")}
+                      aria-pressed={processingLocation === "server"}
+                      disabled={isBusy}
+                    >
+                      On server
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div
+                ref={dropZoneRef}
+                className={cn(styles.dropZone, dragging && styles.dropZoneDragging, file && styles.dropZoneHasFile)}
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  if (!isBusy) setDragging(true);
+                }}
+                onDragOver={(event) => event.preventDefault()}
+                onDragLeave={(event) => {
+                  event.preventDefault();
+                  if (dropZoneRef.current && !dropZoneRef.current.contains(event.relatedTarget as Node)) {
+                    setDragging(false);
+                  }
+                }}
+                onDrop={onDrop}
+              >
+                <input
+                  ref={inputRef}
+                  id="metadata-file-input"
+                  type="file"
+                  accept={mode === "image" ? IMAGE_ACCEPT : VIDEO_ACCEPT}
+                  onChange={onFileChange}
+                  onClick={(event) => {
+                    event.currentTarget.value = "";
+                  }}
+                  className={styles.hiddenInput}
+                  disabled={isBusy}
+                  aria-label={`Choose ${mode} file`}
+                />
+
+                {file ? (
+                  <>
+                    <div className={styles.fileIconWrapper}>
+                      {mode === "image" ? <ImageIcon className="h-5 w-5" /> : <FilmStripIcon className="h-5 w-5" />}
+                    </div>
+                    <div className={styles.fileInfo}>
+                      <p className={styles.fileName}>{file.name}</p>
+                      <p className={styles.fileSize}>
+                        {formatBytes(file.size)} · {getOutputFileName(file.name, "clean")}
+                      </p>
+                    </div>
+                    <span className={styles.replaceFile}>Replace</span>
+                    <button
+                      type="button"
+                      className={styles.fileRemove}
+                      onClick={removeFile}
+                      aria-label="Remove file"
+                      disabled={isBusy}
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className={styles.dropZoneIcon}>
+                      <UploadIcon className="h-5 w-5" />
+                    </div>
+                    <p className={styles.dropZoneLabel}>Drop {mode} or browse</p>
+                  </>
+                )}
+              </div>
+
+              {waitingForServerInspection && (
+                <div
+                  className={cn(styles.serverCallout, serverTooLarge && styles.serverCalloutError)}
+                  role={serverTooLarge ? "alert" : "status"}
+                >
+                  <span>{serverTooLarge ? "File exceeds the 250 MB limit" : "Server inspection required"}</span>
+                  {!serverTooLarge && <Button onClick={inspectOnServer}>Inspect</Button>}
+                </div>
+              )}
+
+              {isBusy && (!showWorkbench || metadataEntries.length > 0) && (
+                <div className={styles.processingPanel} role="status" aria-live="polite">
+                  <div className={styles.processingLine}>
+                    <div className={styles.spinner} />
+                    <p className={styles.processingText}>
+                      {processingState === "inspecting"
+                        ? "Inspecting metadata…"
+                        : processingState === "uploading"
+                          ? "Uploading…"
+                          : "Cleaning and verifying…"}
+                    </p>
+                  </div>
+                  {progress > 0 && processingState !== "inspecting" && (
+                    <div className={styles.uploadProgress}>
+                      <div
+                        className={styles.progressBar}
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={progress}
+                      >
+                        <div className={styles.progressFill} style={{ width: `${progress}%` }} />
+                      </div>
+                      <span>{progress}%</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {file && metadataError && !isBusy && (
+                <div className={cn(styles.feedback, styles.feedbackError)} role="alert">
+                  <XMarkCircleIcon className={cn("h-4 w-4", styles.feedbackIcon)} />
+                  <span>{metadataError}</span>
+                  {mode === "video" &&
+                    processingLocation === "local" &&
+                    file.size <= MAX_SERVER_VIDEO_BYTES &&
+                    (isSupportedVideoType(file.type) || isSupportedVideoExtension(file.name)) && (
+                      <button
+                        type="button"
+                        className={styles.inlineAction}
+                        onClick={() => changeProcessingLocation("server")}
+                      >
+                        Use server
+                      </button>
+                    )}
+                  {mode === "video" && processingLocation === "server" && !serverTooLarge && (
+                    <button type="button" className={styles.inlineAction} onClick={inspectOnServer}>
+                      Retry
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {file && metadataEntries.length > 0 && removableEntries.length > 0 && !isBusy && (
+                <section className={styles.cleaningControls} aria-labelledby="cleaning-level-title">
+                  <div className={styles.sectionHeading}>
+                    <h3 id="cleaning-level-title">Cleaning level</h3>
+                    {preset === "custom" && <span className={styles.customBadge}>Custom</span>}
+                  </div>
+                  <div className={styles.presetButtons} role="group" aria-label="Cleaning level">
+                    <button
+                      type="button"
+                      className={cn(styles.presetButton, preset === "safe" && styles.presetButtonActive)}
+                      onClick={() => applyPreset("safe")}
+                      aria-pressed={preset === "safe"}
+                    >
+                      Safe
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(styles.presetButton, preset === "maximum" && styles.presetButtonActive)}
+                      onClick={() => applyPreset("maximum")}
+                      aria-pressed={preset === "maximum"}
+                    >
+                      Maximum
+                    </button>
+                  </div>
+                </section>
+              )}
+
+              {(hasNothingToClean || hasNoDetectedMetadata) && (
+                <div className={cn(styles.feedback, styles.feedbackSuccess)} role="status">
+                  <CheckCircleIcon className={cn("h-4 w-4", styles.feedbackIcon)} />
+                  This file already appears clean
+                </div>
+              )}
+
+              {message && !report && !hasNothingToClean && !hasNoDetectedMetadata && (
+                <div className={cn(styles.feedback, styles.feedbackSuccess)} role="status">
+                  <CheckCircleIcon className={cn("h-4 w-4", styles.feedbackIcon)} /> {message}
+                </div>
+              )}
+              {error && (
+                <div className={cn(styles.feedback, styles.feedbackError)} role="alert">
+                  <XMarkCircleIcon className={cn("h-4 w-4", styles.feedbackIcon)} /> {error}
+                </div>
+              )}
+            </div>
+
+            {showWorkbench && metadataGroups.length > 0 && (
+              <nav className={styles.groupRail} aria-label="Metadata groups">
+                <span className={styles.groupRailTitle}>Groups</span>
+                <div className={styles.groupList}>
+                  {metadataGroups.map(([group, entries]) => (
+                    <button
+                      key={group}
+                      type="button"
+                      className={cn(
+                        styles.groupButton,
+                        !metadataQuery.trim() && activeGroup === group && styles.groupButtonActive,
+                      )}
+                      onClick={() => {
+                        setActiveGroup(group);
+                        setMetadataQuery("");
+                      }}
+                      aria-pressed={!metadataQuery.trim() && activeGroup === group}
+                      disabled={isBusy}
+                    >
+                      <span>{group}</span>
+                      <span>{entries.length}</span>
+                    </button>
+                  ))}
+                </div>
+              </nav>
+            )}
+          </aside>
+
+          {showWorkbench && (
+            <div className={styles.resultsColumn}>
+              {report && (
+                <section
+                  className={cn(styles.report, report.unresolved.length > 0 && styles.reportWarning)}
+                  aria-labelledby="verification-title"
+                >
+                  <div className={styles.reportHeader}>
+                    {report.unresolved.length > 0 ? (
+                      <WarningIcon className="h-5 w-5" />
+                    ) : (
+                      <CheckCircleIcon className="h-5 w-5" />
+                    )}
+                    <div>
+                      <p id="verification-title" className={styles.reportTitle}>
+                        {report.unresolved.length > 0 ? "Unresolved fields" : "Cleaning verified"}
+                      </p>
+                      <p className={styles.reportText}>
+                        {report.unresolved.length > 0 ? "Download paused" : "Download started"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className={styles.reportStats}>
+                    <span>
+                      <strong>{report.removed.length}</strong> removed
+                    </span>
+                    <span>
+                      <strong>{report.notSelected.length}</strong> not selected
+                    </span>
+                    <span>
+                      <strong>{report.unresolved.length}</strong> unresolved
+                    </span>
+                  </div>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button type="button" variant="secondary" className={styles.reportDetailsTrigger}>
+                        View details <ChevronRightIcon className="h-3.5 w-3.5" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent size="large" className={styles.reportDialog}>
+                      <DialogHeader>
+                        <DialogTitle>Cleaning report</DialogTitle>
+                        <DialogDescription className={styles.visuallyHidden}>
+                          Metadata fields removed, not selected, or left unresolved after cleaning.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className={styles.reportSections}>
+                        {[
+                          {
+                            label: "Removed",
+                            entries: report.removed,
+                            tone: styles.reportSectionRemoved,
+                          },
+                          {
+                            label: "Not selected",
+                            entries: report.notSelected,
+                            tone: styles.reportSectionNotSelected,
+                          },
+                          {
+                            label: "Unresolved",
+                            entries: report.unresolved,
+                            tone: styles.reportSectionUnresolved,
+                          },
+                        ]
+                          .filter(({ entries }) => entries.length > 0)
+                          .map(({ label, entries, tone }) => (
+                            <section key={label} className={cn(styles.reportSection, tone)}>
+                              <header className={styles.reportSectionHeader}>
+                                <h3>{label}</h3>
+                                <span>{entries.length}</span>
+                              </header>
+                              <ul className={styles.reportEntryList}>
+                                {entries.map((entry) => (
+                                  <li key={entry.id} className={styles.reportEntry}>
+                                    <span className={styles.reportEntryName}>{entry.label}</span>
+                                    {duplicateMetadataLabels.has(normalizeMetadataLabel(entry.label)) && (
+                                      <span className={styles.reportEntryOrigin}>{entry.sourceLabel}</span>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            </section>
+                          ))}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                  {report.unresolved.length > 0 && (
+                    <Button
+                      variant="secondary"
+                      className={styles.reportWarningAction}
+                      onClick={() => pendingDownload && downloadBlob(pendingDownload.blob, pendingDownload.fileName)}
+                      disabled={!pendingDownload}
+                    >
+                      <DownloadIcon className="h-4 w-4" /> Download with warning
+                    </Button>
+                  )}
+                </section>
+              )}
+
+              <section className={styles.metadataPanel} aria-labelledby="metadata-panel-title">
+                <div className={styles.metadataHeader}>
+                  <div>
+                    <h2 id="metadata-panel-title">Metadata</h2>
+                    {metadataEntries.length > 0 && (
+                      <p>
+                        {removableEntries.length} removable · {protectedCount} protected
+                      </p>
+                    )}
+                  </div>
+                  {metadataEntries.length > 0 && (
+                    <Input
+                      value={metadataQuery}
+                      onChange={(event) => setMetadataQuery(event.target.value)}
+                      placeholder="Search metadata"
+                      aria-label="Search metadata fields or values"
+                      variant="soft"
+                      className={styles.metadataSearch}
+                      disabled={isBusy}
+                    >
+                      <InputSlot side="left">
+                        <MagnifyingGlassIcon className="h-4 w-4" />
+                      </InputSlot>
+                    </Input>
+                  )}
+                </div>
+
+                {metadataEntries.length > 0 ? (
+                  <div key={inspectionRevision} className={styles.metadataBrowser}>
+                    <div className={styles.metadataContent}>
+                      <ScrollArea className={styles.metadataScroll}>
+                        <div className={styles.metadataScrollInner}>
+                          {visibleGroups.length > 0 ? (
+                            visibleGroups.map(([group, entries]) => {
+                              const selectable = entries.filter((entry) => !entry.protected);
+                              return (
+                                <section key={group} className={styles.metadataGroup}>
+                                  <div className={styles.metadataGroupHeader}>
+                                    <div className={styles.metadataGroupTitle}>
+                                      <h3>{group}</h3>
+                                      <span>
+                                        {entries.length} {entries.length === 1 ? "field" : "fields"}
+                                      </span>
+                                    </div>
+                                    {selectable.length > 0 && (
+                                      <div className={styles.metadataGroupActions}>
+                                        <button
+                                          type="button"
+                                          onClick={() => selectGroup(selectable, true)}
+                                          className={styles.metadataGroupButton}
+                                          disabled={isBusy}
+                                        >
+                                          Select all
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => selectGroup(selectable, false)}
+                                          className={styles.metadataGroupButton}
+                                          disabled={isBusy}
+                                        >
+                                          Clear
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className={styles.metadataList}>
+                                    {entries.map((entry) => {
+                                      const MetadataRow = entry.protected ? "div" : "label";
+                                      return (
+                                        <MetadataRow
+                                          key={entry.id}
+                                          className={cn(
+                                            styles.metadataRow,
+                                            entry.protected && styles.metadataRowProtected,
+                                            selectedMetadata.has(entry.id) && styles.metadataRowSelected,
+                                          )}
+                                        >
+                                          {entry.protected ? (
+                                            <span
+                                              className={styles.metadataProtectedControl}
+                                              title={entry.protectionReason}
+                                              role="img"
+                                              aria-label={
+                                                entry.protectionReason
+                                                  ? `Protected metadata: ${entry.protectionReason}`
+                                                  : "Protected metadata"
+                                              }
+                                            >
+                                              <LockIcon aria-hidden="true" />
+                                            </span>
+                                          ) : (
+                                            <input
+                                              type="checkbox"
+                                              checked={selectedMetadata.has(entry.id)}
+                                              disabled={isBusy}
+                                              onChange={() => toggleMetadataSelection(entry)}
+                                              className={styles.metadataCheckbox}
+                                            />
+                                          )}
+                                          <span className={styles.metadataField}>
+                                            <span className={styles.metadataKey}>{entry.label}</span>
+                                            {duplicateMetadataLabels.has(normalizeMetadataLabel(entry.label)) && (
+                                              <span className={styles.metadataOrigin}>{entry.sourceLabel}</span>
+                                            )}
+                                          </span>
+                                          <span className={styles.metadataValue} title={entry.value}>
+                                            {entry.value}
+                                          </span>
+                                        </MetadataRow>
+                                      );
+                                    })}
+                                  </div>
+                                </section>
+                              );
+                            })
+                          ) : (
+                            <div className={styles.noResults}>No matching metadata</div>
+                          )}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  </div>
+                ) : (
+                  <div className={styles.emptyMetadata} role="status" aria-live="polite">
+                    <div className={styles.emptyMetadataIcon}>
+                      {isBusy ? (
+                        <div className={styles.spinner} />
+                      ) : mode === "image" ? (
+                        <ImageIcon className="h-5 w-5" />
+                      ) : (
+                        <FilmStripIcon className="h-5 w-5" />
+                      )}
+                    </div>
+                    <p>
+                      {!file
+                        ? "Select a file to begin"
+                        : isBusy
+                          ? processingState === "uploading"
+                            ? "Uploading file…"
+                            : "Inspecting metadata…"
+                          : waitingForServerInspection
+                            ? serverTooLarge
+                              ? "Server limit exceeded"
+                              : "Inspect the file to continue"
+                            : metadataError
+                              ? "Metadata unavailable"
+                              : inspectionComplete
+                                ? "No metadata found"
+                                : "Ready to inspect"}
+                    </p>
+                  </div>
+                )}
+
+                {metadataEntries.length > 0 && (
+                  <footer className={styles.metadataFooter} aria-live="polite" aria-atomic="true">
+                    <span className={cn(styles.selectionStatus, selectedCount > 0 && styles.selectionStatusActive)}>
+                      <CheckCircleIcon className={styles.selectionStatusIcon} aria-hidden="true" />
+                      <span className={styles.selectionStatusCopy}>
+                        <strong>{selectedCount}</strong>
+                        <span>{selectedCount === 1 ? "field selected" : "fields selected"}</span>
+                      </span>
+                    </span>
+                  </footer>
+                )}
+              </section>
             </div>
           )}
-
-        {/* Quality slider */}
-        {mode === "image" && file && !isProcessing && isLossy && (
-          <div className={styles.qualitySection}>
-            <span className={styles.qualityLabel}>Quality</span>
-            <input
-              id="quality-slider"
-              type="range"
-              min={60}
-              max={100}
-              step={1}
-              value={quality}
-              onChange={(e) => setQuality(Number(e.target.value))}
-              className={styles.qualitySlider}
-            />
-            <span className={styles.qualityValue}>{quality}</span>
-          </div>
-        )}
-
-        {/* Upload progress */}
-        {mode === "video" && processingState === "uploading" && (
-          <div className={styles.uploadProgress}>
-            <div className={styles.progressBar}>
-              <div className={styles.progressFill} style={{ width: `${uploadProgress}%` }} />
-            </div>
-            <p className={styles.progressText}>Uploading — {uploadProgress}%</p>
-          </div>
-        )}
-
-        {/* Video size limit */}
-        {mode === "video" && !file && !isProcessing && (
-          <p className={styles.sizeLimit}>Max file size: {formatBytes(MAX_VIDEO_BYTES)}</p>
-        )}
-
-        {/* Feedback */}
-        {message && (
-          <div className={cn(styles.feedback, styles.feedbackSuccess)}>
-            <CheckCircleIcon className={cn("h-4 w-4", styles.feedbackIcon)} /> {message}
-          </div>
-        )}
-        {error && (
-          <div className={cn(styles.feedback, styles.feedbackError)}>
-            <XMarkCircleIcon className={cn("h-4 w-4", styles.feedbackIcon)} /> {error}
-          </div>
-        )}
-
-        {/* Privacy notice */}
-        <div className={styles.privacyNotice}>
-          <Shield01Icon className="h-3.5 w-3.5" />
-          {mode === "image"
-            ? "Images are processed entirely in your browser — nothing is uploaded."
-            : "Videos are uploaded to the server for processing and deleted immediately after."}
         </div>
-      </div>
+      </main>
     </>
   );
 }

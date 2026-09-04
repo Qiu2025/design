@@ -1,5 +1,5 @@
 import { Button } from "@/components/button";
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/dialog";
 import { BrandGithubIcon, Info02Icon } from "@raycast/icons";
 import { Shortcut } from "@/components/kbd";
 import { useCallback, useState } from "react";
@@ -14,26 +14,29 @@ export function InfoDialog() {
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button variant="transparent" className="hidden md:flex gap-2">
-          <Info02Icon /> About
+        <Button variant="transparent" className="gap-2" aria-label="About Icon Maker">
+          <Info02Icon />
+          <span className="hidden md:inline">About</span>
         </Button>
       </DialogTrigger>
       <DialogContent size="large">
         <div className="grid gap-8 md:grid-cols-2">
           <div className="flex flex-col gap-3 text-[13px] text-gray-11 leading-relaxed">
             <DialogTitle>About</DialogTitle>
-            <p>Icon Maker is a tool to easily create and export icons.</p>
+            <DialogDescription className="text-[13px] text-gray-11 leading-relaxed">
+              Icon Maker is a tool to easily create and export icons.
+            </DialogDescription>
             <p>
               Search for an icon or import your’s, change the color of the icon, and customize the background to create
               a beautifully simple icon.
             </p>
             <p>Edit the file name, and when you’re ready, click export icon in the top-right corner to export.</p>
             <a
-              href="https://github.com/Qiu2025/snap-box"
+              href="https://github.com/Qiu2025/design"
               className="inline-flex w-fit items-center gap-2 text-gray-12 underline underline-offset-2"
             >
               <BrandGithubIcon className="h-4 w-4" />
-              github.com/Qiu2025/snap-box
+              github.com/Qiu2025/design
             </a>
           </div>
 

@@ -1,4 +1,4 @@
-import classNames from "classnames";
+import { cn } from "@/utils/cn";
 import { useAtom, useAtomValue } from "jotai";
 import React, { useEffect, useRef, useState } from "react";
 
@@ -60,7 +60,7 @@ const StripeFrame = () => {
 
   return (
     <div
-      className={classNames(
+      className={cn(
         sharedStyles.frame,
         showBackground && styles.frame,
         !darkMode && styles.frameLightMode,
@@ -84,7 +84,7 @@ const StripeFrame = () => {
             <div className={styles.backgroundGridline}></div>
           </div>
 
-          <div className={classNames(styles.stripe)}>
+          <div className={cn(styles.stripe)}>
             <div
               className={styles.backgroundGridlineContainer}
               style={{ "--window-width": `${innerWindowWidth}px` } as React.CSSProperties}
@@ -95,7 +95,7 @@ const StripeFrame = () => {
               <div className={styles.backgroundGridline}></div>
               <div className={styles.backgroundGridline}></div>
 
-              <div className={classNames(styles.set, frameHeight < 240 && styles.isSmall)}>
+              <div className={cn(styles.set, frameHeight < 240 && styles.isSmall)}>
                 <div className={styles.layer1} />
                 <div className={styles.layer2} />
                 <div className={styles.intersection} />
@@ -105,7 +105,7 @@ const StripeFrame = () => {
         </div>
       )}
 
-      <div className={classNames(styles.window, isSafari && styles.isSafari)} ref={windowRef}>
+      <div className={cn(styles.window, isSafari && styles.isSafari)} ref={windowRef}>
         <Editor />
       </div>
     </div>

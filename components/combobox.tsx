@@ -68,87 +68,6 @@ const ComboboxTrigger = React.forwardRef<React.ElementRef<typeof ComboboxPrimiti
 ComboboxTrigger.displayName = "ComboboxTrigger";
 
 // ============================================================================
-// Input
-// ============================================================================
-
-const inputVariants = cva(`w-full bg-transparent text-inherit outline-none placeholder:text-gray-a8`, {
-  variants: {
-    size: {
-      small: "text-sm",
-      medium: "text-sm",
-      large: "text-base",
-    },
-  },
-  defaultVariants: {
-    size: "medium",
-  },
-});
-
-export interface ComboboxInputProps
-  extends Omit<React.ComponentPropsWithoutRef<typeof ComboboxPrimitive.Input>, "className" | "size">,
-    VariantProps<typeof inputVariants> {
-  className?: string;
-}
-
-const ComboboxInput = React.forwardRef<React.ElementRef<typeof ComboboxPrimitive.Input>, ComboboxInputProps>(
-  ({ className, size, ...props }, ref) => {
-    return <ComboboxPrimitive.Input ref={ref} className={cn(inputVariants({ size, className }))} {...props} />;
-  },
-);
-ComboboxInput.displayName = "ComboboxInput";
-
-// ============================================================================
-// Input Container (for standalone input with trigger button)
-// ============================================================================
-
-const inputContainerVariants = cva(
-  `flex w-full items-center whitespace-nowrap rounded-md text-sm font-normal transition-colors duration-100 overflow-hidden
-  focus-within:outline-none focus-within:ring-1
-  disabled:pointer-events-none disabled:opacity-50`,
-  {
-    variants: {
-      variant: {
-        classic:
-          "bg-gray-2 text-gray-a12 border border-gray-a4 hover:border-gray-a6 focus-within:border-gray-a6 ring-transparent",
-        soft: "bg-gray-a3 text-gray-a12 border border-gray-a3 hover:border-gray-a5 focus-within:border-gray-a5 ring-transparent",
-      },
-      size: {
-        small: "h-[24px] rounded-md px-2 text-sm gap-1",
-        medium: "h-[30px] rounded-md px-2 text-sm gap-1",
-        large: "h-9 px-3 py-2 gap-2",
-      },
-    },
-    defaultVariants: {
-      variant: "classic",
-      size: "medium",
-    },
-  },
-);
-
-export interface ComboboxInputContainerProps
-  extends React.HTMLAttributes<HTMLDivElement>,
-    VariantProps<typeof inputContainerVariants> {
-  icon?: React.ElementType;
-}
-
-const ComboboxInputContainer = React.forwardRef<HTMLDivElement, ComboboxInputContainerProps>(
-  ({ className, variant, size = "medium", children, icon, ...props }, ref) => {
-    const IconComponent = icon ?? ChevronDownIcon;
-    return (
-      <div ref={ref} className={cn(inputContainerVariants({ variant, size, className }))} {...props}>
-        {children}
-        <ComboboxPrimitive.Trigger className="ml-auto shrink-0 p-0 bg-transparent border-none cursor-default">
-          <ComboboxPrimitive.Icon>
-            <IconComponent className="h-4 w-4 opacity-50" />
-          </ComboboxPrimitive.Icon>
-        </ComboboxPrimitive.Trigger>
-      </div>
-    );
-  },
-);
-ComboboxInputContainer.displayName = "ComboboxInputContainer";
-
-// ============================================================================
 // Value
 // ============================================================================
 
@@ -298,18 +217,6 @@ const ComboboxItemText = React.forwardRef<HTMLSpanElement, React.HTMLAttributes<
 ComboboxItemText.displayName = "ComboboxItemText";
 
 // ============================================================================
-// ItemIndicator
-// ============================================================================
-
-const ComboboxItemIndicator = React.forwardRef<
-  React.ElementRef<typeof ComboboxPrimitive.ItemIndicator>,
-  React.ComponentPropsWithoutRef<typeof ComboboxPrimitive.ItemIndicator>
->(({ className, ...props }, ref) => (
-  <ComboboxPrimitive.ItemIndicator ref={ref} className={cn("", className)} {...props} />
-));
-ComboboxItemIndicator.displayName = "ComboboxItemIndicator";
-
-// ============================================================================
 // Separator
 // ============================================================================
 
@@ -338,20 +245,12 @@ const ComboboxEmpty = React.forwardRef<
 ComboboxEmpty.displayName = "ComboboxEmpty";
 
 // ============================================================================
-// useFilter hook re-export
-// ============================================================================
-
-const useComboboxFilter = ComboboxPrimitive.useFilter;
-
-// ============================================================================
 // Exports
 // ============================================================================
 
 export {
   Combobox,
   ComboboxTrigger,
-  ComboboxInput,
-  ComboboxInputContainer,
   ComboboxValue,
   ComboboxContent,
   ComboboxList,
@@ -359,10 +258,7 @@ export {
   ComboboxGroupLabel,
   ComboboxItem,
   ComboboxItemText,
-  ComboboxItemIndicator,
   ComboboxSeparator,
   ComboboxEmpty,
-  useComboboxFilter,
   triggerVariants as comboboxTriggerVariants,
-  inputContainerVariants as comboboxInputContainerVariants,
 };

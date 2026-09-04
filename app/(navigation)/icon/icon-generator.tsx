@@ -4,7 +4,7 @@ import React, { use, useCallback, useEffect, useRef, useState } from "react";
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import cn from "classnames";
+import { cn } from "@/utils/cn";
 import { CSSTransition } from "react-transition-group";
 import { ColorChangeHandler } from "react-color";
 import dynamic from "next/dynamic";
@@ -276,12 +276,258 @@ const ColorInput = ({ value, name, recentColors, onChange, disabled = false }: C
   );
 };
 
+type NumberSettingInputProps = {
+  label: string;
+  name: string;
+  value?: number;
+  min?: number;
+  max?: number;
+  step?: number;
+  unit?: string;
+  className?: string;
+  size?: "medium" | "large";
+  disabled?: boolean;
+  formItemClassName?: string;
+  onValueChange: (value: number, commit: boolean) => void;
+};
+
+const parseFiniteNumber = (value: unknown) => {
+  if (value === undefined || value === null || value === "") return undefined;
+
+  const parsedValue = typeof value === "number" ? value : Number(value);
+
+  return Number.isFinite(parsedValue) ? parsedValue : undefined;
+};
+
+const formatNumberValue = (value: unknown) => {
+  const parsedValue = parseFiniteNumber(value);
+  if (parsedValue === undefined) return "";
+
+  return Number(parsedValue.toFixed(4)).toString();
+};
+
+const normalizeNumberSettings = (settings: SettingsType, defaults: SettingsType): SettingsType => ({
+  ...settings,
+  backgroundAngle: parseFiniteNumber(settings.backgroundAngle) ?? parseFiniteNumber(defaults.backgroundAngle) ?? 0,
+  backgroundSpread: parseFiniteNumber(settings.backgroundSpread) ?? defaults.backgroundSpread,
+  backgroundRadius: parseFiniteNumber(settings.backgroundRadius) ?? defaults.backgroundRadius,
+  backgroundStrokeSize: parseFiniteNumber(settings.backgroundStrokeSize) ?? defaults.backgroundStrokeSize,
+  backgroundStrokeOpacity: parseFiniteNumber(settings.backgroundStrokeOpacity) ?? defaults.backgroundStrokeOpacity,
+  backgroundNoiseTextureOpacity:
+    parseFiniteNumber(settings.backgroundNoiseTextureOpacity) ?? defaults.backgroundNoiseTextureOpacity,
+  iconSize: parseFiniteNumber(settings.iconSize) ?? defaults.iconSize,
+  iconOffsetX: parseFiniteNumber(settings.iconOffsetX) ?? defaults.iconOffsetX,
+  iconOffsetY: parseFiniteNumber(settings.iconOffsetY) ?? defaults.iconOffsetY,
+});
+
+const clampNumberValue = (value: number, min?: number, max?: number) => {
+  const withMin = min === undefined ? value : Math.max(min, value);
+
+  return max === undefined ? withMin : Math.min(max, withMin);
+};
+
+const NumberSettingInput = ({
+  label,
+  name,
+  value,
+  min,
+  max,
+  step = 1,
+  unit,
+  className = "w-[120px]",
+  size = "large",
+  disabled = false,
+  formItemClassName,
+  onValueChange,
+}: NumberSettingInputProps) => {
+  const [draftValue, setDraftValue] = useState(formatNumberValue(value));
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dragRef = useRef<
+    | {
+        pointerId: number;
+        startX: number;
+        startValue: number;
+        currentValue: number;
+        isDragging: boolean;
+      }
+    | undefined
+  >(undefined);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      if (!dragRef.current?.isDragging) {
+        setDraftValue(formatNumberValue(value));
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [value]);
+
+  const getValidValue = (nextValue: string) => {
+    const parsedValue = parseFiniteNumber(nextValue);
+
+    if (parsedValue === undefined) {
+      return undefined;
+    }
+
+    return clampNumberValue(parsedValue, min, max);
+  };
+
+  const commitValue = (nextValue: string) => {
+    const validValue = getValidValue(nextValue);
+
+    if (validValue === undefined) {
+      setDraftValue(formatNumberValue(value));
+      return;
+    }
+
+    setDraftValue(formatNumberValue(validValue));
+    if (validValue !== parseFiniteNumber(value)) {
+      onValueChange(validValue, true);
+    }
+  };
+
+  const changeByStep = (direction: 1 | -1) => {
+    const currentValue = getValidValue(draftValue) ?? parseFiniteNumber(value) ?? min ?? 0;
+    const nextValue = clampNumberValue(currentValue + direction * step, min, max);
+
+    setDraftValue(formatNumberValue(nextValue));
+    if (nextValue !== currentValue) {
+      onValueChange(nextValue, true);
+    }
+  };
+
+  const onInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    event.stopPropagation();
+    setDraftValue(event.currentTarget.value);
+  };
+
+  const onInputKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      event.currentTarget.blur();
+      return;
+    }
+
+    if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      event.preventDefault();
+      changeByStep(event.key === "ArrowUp" ? 1 : -1);
+    }
+  };
+
+  const onScrubPointerDown = (event: React.PointerEvent<HTMLSpanElement>) => {
+    if (disabled || event.button !== 0 || event.pointerType !== "mouse") return;
+
+    event.preventDefault();
+
+    const startValue = getValidValue(draftValue) ?? parseFiniteNumber(value) ?? min ?? 0;
+
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startValue,
+      currentValue: startValue,
+      isDragging: false,
+    };
+  };
+
+  const onScrubPointerMove = (event: React.PointerEvent<HTMLSpanElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    const distance = event.clientX - drag.startX;
+    if (!drag.isDragging && Math.abs(distance) < 4) return;
+
+    if (!drag.isDragging) {
+      drag.isDragging = true;
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+
+    event.preventDefault();
+
+    const modifier = event.shiftKey ? 0.1 : event.altKey ? 10 : 1;
+    const nextValue = clampNumberValue(drag.startValue + Math.round(distance / 4) * step * modifier, min, max);
+
+    if (nextValue === drag.currentValue) return;
+
+    drag.currentValue = nextValue;
+    setDraftValue(formatNumberValue(nextValue));
+    onValueChange(nextValue, false);
+  };
+
+  const onScrubPointerUp = (event: React.PointerEvent<HTMLSpanElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    if (drag.isDragging) {
+      event.preventDefault();
+      if (drag.currentValue !== drag.startValue) {
+        onValueChange(drag.currentValue, true);
+      }
+    } else {
+      inputRef.current?.focus();
+    }
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+    dragRef.current = undefined;
+  };
+
+  const onScrubPointerCancel = (event: React.PointerEvent<HTMLSpanElement>) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+
+    if (drag.isDragging) {
+      setDraftValue(formatNumberValue(drag.startValue));
+      onValueChange(drag.startValue, false);
+    }
+
+    dragRef.current = undefined;
+  };
+
+  return (
+    <label className={cn(styles.formItem, formItemClassName)}>
+      <span
+        className={styles.numberInputLabel}
+        title="Arrastra horizontalmente para ajustar"
+        onPointerDown={onScrubPointerDown}
+        onPointerMove={onScrubPointerMove}
+        onPointerUp={onScrubPointerUp}
+        onPointerCancel={onScrubPointerCancel}
+      >
+        {label}
+      </span>
+      <div className={styles.numberInputWrapper}>
+        <Input
+          ref={inputRef}
+          name={name}
+          type="number"
+          value={draftValue}
+          min={min}
+          max={max}
+          step={step}
+          disabled={disabled}
+          className={className}
+          size={size}
+          onChange={onInputChange}
+          onBlur={() => commitValue(draftValue)}
+          onKeyDown={onInputKeyDown}
+        >
+          {unit && <InputSlot>{unit}</InputSlot>}
+        </Input>
+      </div>
+    </label>
+  );
+};
+
 let infoMessageTimeout: NodeJS.Timeout | undefined;
 
 export const IconGenerator = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const searchTerm = searchParams.get("q") || "";
+  const ICON_SETTINGS_STORAGE_KEY = "rayso.icon.settings.v1";
 
   const booleanSettingKeys = new Set(["backgroundRadialGlare", "backgroundNoiseTexture"]);
   const numberSettingKeys = new Set([
@@ -297,9 +543,7 @@ export const IconGenerator = () => {
     "selectedPresetIndex",
   ]);
 
-  const [scale, setScale] = useState<number>(() =>
-    typeof window !== "undefined" && window.innerWidth < 512 ? window.innerWidth / 512 - 0.03125 * 2 : 1,
-  );
+  const [scale, setScale] = useState<number>(1);
   const [initialSettings] = useState<SettingsType>(() => {
     const defaultPresetIndex = 0;
     const defaultIcon = (Object.keys(Icons)[0] || "Dots") as IconName;
@@ -348,14 +592,13 @@ export const IconGenerator = () => {
       };
     }, {} as Partial<SettingsType>);
 
-    return { ...baseSettings, ...settingsFromUrl };
+    return normalizeNumberSettings({ ...baseSettings, ...settingsFromUrl }, baseSettings);
   });
   const [history, setHistory] = useState<SettingsType[]>(() => [initialSettings]);
   const [redoHistory, setRedoHistory] = useState<SettingsType[]>([]);
   const [recentColors, setRecentColors] = useState<string[]>([]);
   const [showExportModal, setShowExportModal] = useState<boolean>(false);
   const [panelsVisible, setPanelsVisible] = useState<boolean>(true);
-  const [headerVisible, setHeaderVisible] = useState<boolean>(true);
   const [infoMessage, setInfoMessage] = useState<string>();
   const [infoMessageVisible, setInfoMessageVisible] = useState<boolean>(false);
   const [showInfoMessageUndoButton, setShowInfoMessageUndoButton] = useState<boolean>(true);
@@ -366,6 +609,8 @@ export const IconGenerator = () => {
 
   const [draggingFile, setDraggingFile] = useState<boolean>(false);
   const [settings, setSettings] = useState<SettingsType>(initialSettings);
+  const [settingsHydrated, setSettingsHydrated] = useState(false);
+  const hasUrlState = Object.keys(initialSettings).some((key) => searchParams.get(key) !== null);
   const pngClipboardSupported = usePngClipboardSupported();
 
   const searchRef = useRef<HTMLInputElement>(null);
@@ -375,6 +620,43 @@ export const IconGenerator = () => {
   const formRef = useRef<HTMLFormElement>(null);
   const infoMessageRef = useRef<HTMLDivElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (window.innerWidth >= 512) return;
+
+    // This must happen after hydration because the server has no viewport width.
+    setScale(window.innerWidth / 512 - 0.03125 * 2);
+  }, []);
+
+  useEffect(() => {
+    if (hasUrlState) {
+      setSettingsHydrated(true);
+      return;
+    }
+
+    try {
+      const persistedRaw = window.localStorage.getItem(ICON_SETTINGS_STORAGE_KEY);
+
+      if (persistedRaw) {
+        const persistedSettings = JSON.parse(persistedRaw) as Partial<SettingsType>;
+        const restoredSettings = normalizeNumberSettings(
+          {
+            ...initialSettings,
+            ...persistedSettings,
+          },
+          initialSettings,
+        );
+
+        // Restore persisted preferences after the server/client trees match.
+        setSettings(restoredSettings);
+        setHistory([restoredSettings]);
+      }
+    } catch {
+      // Ignore invalid persisted settings and continue with the URL/default state.
+    } finally {
+      setSettingsHydrated(true);
+    }
+  }, [hasUrlState, initialSettings]);
 
   const pushNewSettings = useCallback(
     (newSettings: Partial<SettingsType>) => {
@@ -402,6 +684,16 @@ export const IconGenerator = () => {
       setInfoMessageVisible(false);
     }, 3000);
   };
+
+  useEffect(() => {
+    if (!settingsHydrated) return;
+
+    try {
+      window.localStorage.setItem(ICON_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    } catch {
+      // Ignore storage failures (private mode, quota exceeded, etc.)
+    }
+  }, [settings, settingsHydrated]);
 
   const undo = useCallback(() => {
     if (history.length <= 1) {
@@ -644,7 +936,15 @@ export const IconGenerator = () => {
     const formData = new FormData(formRef.current);
     const data: Record<string, unknown> = {};
     formData.forEach((value, key) => {
-      data[key] = value;
+      if (numberSettingKeys.has(key)) {
+        const parsedValue = Number(value);
+        data[key] =
+          value === "" || !Number.isFinite(parsedValue)
+            ? (parseFiniteNumber(settings[key as keyof SettingsType]) ?? 0)
+            : parsedValue;
+      } else {
+        data[key] = value;
+      }
     });
 
     // If these properties change, we need to detach from preset
@@ -659,6 +959,28 @@ export const IconGenerator = () => {
       backgroundNoiseTexture: data.backgroundNoiseTexture ? true : false,
       selectedPresetIndex: shouldDetatchPreset ? null : settings.selectedPresetIndex,
     });
+  };
+
+  const onNumberSettingChange = (settingName: keyof SettingsType, value: number, commit: boolean) => {
+    if (!Number.isFinite(value)) return;
+
+    const newSettings: Partial<SettingsType> = {
+      [settingName]: value,
+    };
+
+    if (settingName === "backgroundAngle") {
+      newSettings.selectedPresetIndex = null;
+    }
+
+    if (commit) {
+      pushNewSettings(newSettings);
+      return;
+    }
+
+    setSettings((currentSettings) => ({
+      ...currentSettings,
+      ...newSettings,
+    }));
   };
 
   const onPresetChange = (preset: Partial<SettingsType>, index: number) => {
@@ -713,13 +1035,6 @@ export const IconGenerator = () => {
       });
       onSaveRecentColor(color);
     };
-
-  const onChangeAngle = (event: React.ChangeEvent<HTMLInputElement>) => {
-    return pushNewSettings({
-      backgroundAngle: Number(event.target.value),
-      selectedPresetIndex: null,
-    });
-  };
 
   // TODO: update to the latest react-color when it is released and use onChangeComplete
   const onSaveRecentColor = debounce((color: string) => {
@@ -810,18 +1125,6 @@ export const IconGenerator = () => {
     { value: "0%,50%", label: "Left" },
   ];
 
-  const onShare = async () => {
-    try {
-      const url = buildShareUrl();
-      await navigator.share({
-        title: "SnapBox Icon",
-        url,
-      });
-    } catch (err) {
-      console.error("sharing not available");
-    }
-  };
-
   return (
     <div className={styles.container}>
       <ExportModal
@@ -857,7 +1160,7 @@ export const IconGenerator = () => {
         <div className={cn(styles.actions, styles.actionsLeft)}>
           <Button
             variant="transparent"
-            className={styles.undoButton}
+            className={cn(styles.undoButton, "h-8")}
             disabled={history.length <= 1}
             title="Ctrl+Z"
             onClick={undo}
@@ -868,7 +1171,7 @@ export const IconGenerator = () => {
 
           <Button
             variant="transparent"
-            className={styles.redoButton}
+            className={cn(styles.redoButton, "h-8")}
             disabled={redoHistory.length === 0}
             title="Ctrl+Y"
             onClick={redo}
@@ -895,17 +1198,18 @@ export const IconGenerator = () => {
           </div>
         </div>
         <div className={cn(styles.actions, styles.actionsRight)}>
-          <div className="flex gap-2 sm:hidden">
-            <Button variant="primary" className={styles.exportButton} onClick={onShare}>
-              <DownloadIcon /> Share Icon
-            </Button>
-          </div>
-          <div className="sm:flex gap-2 hidden">
+          <div className="flex gap-2">
             <InfoDialog />
             <ButtonGroup>
-              <Button variant="primary" className={styles.exportButton} onClick={() => setShowExportModal(true)}>
+              <Button
+                variant="primary"
+                className={styles.exportButton}
+                aria-label="Export icon"
+                onClick={() => setShowExportModal(true)}
+              >
                 <DownloadIcon />
-                Export icon
+                <span className="hidden min-[360px]:inline sm:hidden">Export</span>
+                <span className="hidden sm:inline">Export icon</span>
               </Button>
               <DropdownMenu open={exportDropdownOpen} onOpenChange={setExportDropdownOpen}>
                 <DropdownMenuTrigger asChild>
@@ -1029,7 +1333,7 @@ export const IconGenerator = () => {
               <div className={styles.emptyIconsList}>
                 <BrushIcon className={styles.emptyIconsListIcon} />
                 We couldn’t find an icon for that
-                <Link href="https://github.com/Qiu2025/snap-box">
+                <Link href="https://github.com/Qiu2025/design">
                   Browse all icons <ArrowRightIcon />
                 </Link>
               </div>
@@ -1224,37 +1528,26 @@ export const IconGenerator = () => {
                               </SelectContent>
                             </Select>
                           </label>
-                          <label className={styles.formItem}>
-                            <span>Spread</span>
-                            <Input
-                              name="backgroundSpread"
-                              type="number"
-                              defaultValue={settings.backgroundSpread}
-                              min={0}
-                              max={100}
-                              className="w-[120px]"
-                              size="large"
-                            >
-                              <InputSlot>%</InputSlot>
-                            </Input>
-                          </label>
+                          <NumberSettingInput
+                            label="Spread"
+                            name="backgroundSpread"
+                            value={settings.backgroundSpread}
+                            min={0}
+                            max={100}
+                            unit="%"
+                            onValueChange={(value, commit) => onNumberSettingChange("backgroundSpread", value, commit)}
+                          />
                         </>
                       ) : settings.backgroundFillType === "Linear" ? (
-                        <label className={styles.formItem}>
-                          <span>Angle</span>
-                          <Input
-                            name="backgroundAngle"
-                            type="number"
-                            onChange={onChangeAngle}
-                            defaultValue={settings.backgroundAngle}
-                            min={0}
-                            max={360}
-                            className="w-[120px]"
-                            size="large"
-                          >
-                            <InputSlot>º</InputSlot>
-                          </Input>
-                        </label>
+                        <NumberSettingInput
+                          label="Angle"
+                          name="backgroundAngle"
+                          value={settings.backgroundAngle}
+                          min={0}
+                          max={360}
+                          unit="º"
+                          onValueChange={(value, commit) => onNumberSettingChange("backgroundAngle", value, commit)}
+                        />
                       ) : null}
                     </div>
                   </details>
@@ -1292,46 +1585,36 @@ export const IconGenerator = () => {
                           className="focus-visible:ring-offset-gray-3"
                         />
                       </label>
-                      <label className={cn(styles.formItem, !settings.backgroundNoiseTexture && styles.disabled)}>
-                        <span>Noise opacity</span>
-                        <Input
-                          name="backgroundNoiseTextureOpacity"
-                          type="number"
-                          min={0}
-                          max={100}
-                          defaultValue={settings.backgroundNoiseTextureOpacity}
-                          className="w-[120px]"
-                          size="large"
-                        >
-                          <InputSlot>%</InputSlot>
-                        </Input>
-                      </label>
-                      <label className={cn(styles.formItem)}>
-                        <span>Radius</span>
-                        <Input
-                          name="backgroundRadius"
-                          type="number"
-                          min={0}
-                          max={256}
-                          defaultValue={settings.backgroundRadius}
-                          className="w-[120px]"
-                          size="large"
-                        >
-                          <InputSlot>px</InputSlot>
-                        </Input>
-                      </label>
-                      <label className={styles.formItem}>
-                        <span>Stroke size</span>
-                        <Input
-                          name="backgroundStrokeSize"
-                          type="number"
-                          min={0}
-                          defaultValue={settings.backgroundStrokeSize}
-                          className="w-[120px]"
-                        >
-                          <InputSlot>px</InputSlot>
-                        </Input>
-                      </label>
+                      <NumberSettingInput
+                        label="Noise opacity"
+                        name="backgroundNoiseTextureOpacity"
+                        value={settings.backgroundNoiseTextureOpacity}
+                        min={0}
+                        max={100}
+                        unit="%"
+                        disabled={!settings.backgroundNoiseTexture}
+                        formItemClassName={cn(!settings.backgroundNoiseTexture && styles.disabled)}
+                        onValueChange={(value, commit) =>
+                          onNumberSettingChange("backgroundNoiseTextureOpacity", value, commit)
+                        }
+                      />
+                      <NumberSettingInput
+                        label="Radius"
+                        name="backgroundRadius"
+                        value={settings.backgroundRadius}
+                        min={0}
+                        max={256}
+                        unit="px"
+                        onValueChange={(value, commit) => onNumberSettingChange("backgroundRadius", value, commit)}
+                      />
+                      <NumberSettingInput
+                        label="Stroke size"
+                        name="backgroundStrokeSize"
+                        value={settings.backgroundStrokeSize}
+                        min={0}
+                        unit="px"
+                        onValueChange={(value, commit) => onNumberSettingChange("backgroundStrokeSize", value, commit)}
+                      />
                       <label className={cn(styles.formItem, settings.backgroundStrokeSize == 0 && styles.disabled)}>
                         <span>Stroke color</span>
                         <ColorInput
@@ -1341,18 +1624,19 @@ export const IconGenerator = () => {
                           recentColors={recentColors}
                         />
                       </label>
-                      <label className={cn(styles.formItem, settings.backgroundStrokeSize == 0 && styles.disabled)}>
-                        <span>Stroke opacity</span>
-                        <Input
-                          name="backgroundStrokeOpacity"
-                          type="number"
-                          defaultValue={settings.backgroundStrokeOpacity}
-                          className="w-[120px]"
-                          size="large"
-                        >
-                          <InputSlot>%</InputSlot>
-                        </Input>
-                      </label>
+                      <NumberSettingInput
+                        label="Stroke opacity"
+                        name="backgroundStrokeOpacity"
+                        value={settings.backgroundStrokeOpacity}
+                        min={0}
+                        max={100}
+                        unit="%"
+                        disabled={settings.backgroundStrokeSize == 0}
+                        formItemClassName={cn(settings.backgroundStrokeSize == 0 && styles.disabled)}
+                        onValueChange={(value, commit) =>
+                          onNumberSettingChange("backgroundStrokeOpacity", value, commit)
+                        }
+                      />
                     </div>
                   </details>
 
@@ -1374,49 +1658,28 @@ export const IconGenerator = () => {
                           />
                         </label>
                       )}
-                      <label className={styles.formItem}>
-                        <span>Size</span>
-                        <div className={cn(styles.inputWrapper, styles.inputWithUnit)}>
-                          <Input
-                            name="iconSize"
-                            type="number"
-                            defaultValue={settings.iconSize}
-                            min={0}
-                            className="w-[120px]"
-                            size="large"
-                          >
-                            <InputSlot>px</InputSlot>
-                          </Input>
-                        </div>
-                      </label>
-                      <label className={styles.formItem}>
-                        <span>X Offset</span>
-                        <div className={cn(styles.inputWrapper, styles.inputWithUnit)}>
-                          <Input
-                            name="iconOffsetX"
-                            type="number"
-                            defaultValue={settings.iconOffsetX}
-                            className="w-[120px]"
-                            size="large"
-                          >
-                            <InputSlot>px</InputSlot>
-                          </Input>
-                        </div>
-                      </label>
-                      <label className={styles.formItem}>
-                        <span>Y Offset</span>
-                        <div className="flex flex-col">
-                          <Input
-                            name="iconOffsetY"
-                            type="number"
-                            defaultValue={settings.iconOffsetY}
-                            className="w-[120px]"
-                            size="large"
-                          >
-                            <InputSlot>px</InputSlot>
-                          </Input>
-                        </div>
-                      </label>
+                      <NumberSettingInput
+                        label="Size"
+                        name="iconSize"
+                        value={settings.iconSize}
+                        min={0}
+                        unit="px"
+                        onValueChange={(value, commit) => onNumberSettingChange("iconSize", value, commit)}
+                      />
+                      <NumberSettingInput
+                        label="X Offset"
+                        name="iconOffsetX"
+                        value={settings.iconOffsetX}
+                        unit="px"
+                        onValueChange={(value, commit) => onNumberSettingChange("iconOffsetX", value, commit)}
+                      />
+                      <NumberSettingInput
+                        label="Y Offset"
+                        name="iconOffsetY"
+                        value={settings.iconOffsetY}
+                        unit="px"
+                        onValueChange={(value, commit) => onNumberSettingChange("iconOffsetY", value, commit)}
+                      />
                     </div>
                   </details>
                 </form>

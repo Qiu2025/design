@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import cn from "classnames";
+import { cn } from "@/utils/cn";
 
 import { PlusIcon, TrashIcon } from "@raycast/icons";
 import { toPng as htmlToPng } from "html-to-image";
@@ -9,7 +9,7 @@ import { toPng as htmlToPng } from "html-to-image";
 import styles from "./ExportModal.module.css";
 import { Select, SelectItem, SelectContent, SelectItemText, SelectValue, SelectTrigger } from "@/components/select";
 import { Button } from "@/components/button";
-import { Dialog, DialogContent, DialogTitle } from "@/components/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/dialog";
 import { Input, InputSlot } from "@/components/input";
 import download from "../../(code)/util/download";
 
@@ -150,6 +150,7 @@ function ExportModal({ open, onOpenChange, onStartExport, fileName, svgRef }: Ex
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="medium">
         <DialogTitle>Export Icons</DialogTitle>
+        <DialogDescription>Choose the file name, format and size for each exported icon.</DialogDescription>
         {exportOptions.map((option, index) => (
           <div className={styles.exportOption} key={index}>
             <div className={styles.exportOptionFileName}>

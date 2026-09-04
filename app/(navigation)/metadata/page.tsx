@@ -3,7 +3,8 @@ import { Suspense } from "react";
 import { MetadataRemover } from "./metadata-remover";
 
 const pageTitle = "Metadata Remover";
-const pageDescription = "Remove metadata from images and videos with a privacy-first workflow.";
+const pageDescription =
+  "Inspect, remove and verify listed metadata tags in images and videos with a local-first workflow.";
 
 export const metadata: Metadata = {
   title: pageTitle,

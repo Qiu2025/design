@@ -1,6 +1,5 @@
 import React from "react";
 import { useAtom } from "jotai";
-import classNames from "classnames";
 import * as ToggleGroup from "@radix-ui/react-toggle-group";
 
 import ControlContainer from "./ControlContainer";

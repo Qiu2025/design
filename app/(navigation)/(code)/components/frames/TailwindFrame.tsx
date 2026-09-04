@@ -1,5 +1,5 @@
 /* eslint-disable @next/next/no-img-element */
-import classNames from "classnames";
+import { cn } from "@/utils/cn";
 import { useAtom, useAtomValue } from "jotai";
 
 import beams from "../../assets/tailwind/beams.png";
@@ -21,7 +21,7 @@ const TailwindFrame = () => {
 
   return (
     <div
-      className={classNames(
+      className={cn(
         sharedStyles.frame,
         showBackground && styles.frame,
         !darkMode && styles.frameLightMode,
@@ -47,11 +47,11 @@ const TailwindFrame = () => {
             </div>
           </>
         )}
-        <div className={classNames(sharedStyles.header, styles.header)}>
+        <div className={cn(sharedStyles.header, styles.header)}>
           <div className={sharedStyles.controls}>
-            <div className={classNames(sharedStyles.control, styles.control)}></div>
-            <div className={classNames(sharedStyles.control, styles.control)}></div>
-            <div className={classNames(sharedStyles.control, styles.control)}></div>
+            <div className={cn(sharedStyles.control, styles.control)}></div>
+            <div className={cn(sharedStyles.control, styles.control)}></div>
+            <div className={cn(sharedStyles.control, styles.control)}></div>
           </div>
         </div>
         <Editor />

@@ -2,10 +2,14 @@
   display: flex;
   justify-content: center;
   grid-area: content;
-  transform: scale(0.6);
+  zoom: 0.6;
 
   @media (min-width: 768px) {
-    transform: scale(1);
+    zoom: 1;
+  }
+
+  @media (min-width: 768px) and (max-width: 1119px) and (max-height: 500px) {
+    zoom: 0.5;
   }
 }
 

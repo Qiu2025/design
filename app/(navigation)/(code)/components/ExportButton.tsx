@@ -41,7 +41,7 @@ const ExportButton: React.FC = () => {
   const [, setFlashMessage] = useAtom(derivedFlashMessageAtom);
   const [, setFlashShown] = useAtom(flashShownAtom);
   const customFileName = useAtomValue(fileNameAtom);
-  const fileName = customFileName.replaceAll(" ", "-") || "snapbox-code";
+  const fileName = customFileName.replaceAll(" ", "-") || "design-code";
   const [exportSize, setExportSize] = useAtom(exportSizeAtom);
 
   const savePng = async () => {
@@ -149,7 +149,8 @@ const ExportButton: React.FC = () => {
     <ButtonGroup>
       <Button onClick={handleExportClick} variant="primary" aria-label="Export as PNG">
         <DownloadIcon className="w-4 h-4" />
-        Export <span className="hidden md:inline-block">Image</span>
+        <span className="hidden min-[360px]:inline">Export</span>
+        <span className="hidden md:inline-block">Image</span>
       </Button>
       <DropdownMenu open={dropdownOpen} onOpenChange={(open) => setDropdownOpen(open)}>
         <DropdownMenuTrigger asChild>

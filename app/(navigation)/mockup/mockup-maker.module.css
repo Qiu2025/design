@@ -1,0 +1,1028 @@
+.container {
+  display: flex;
+  width: 100%;
+  min-height: calc(100dvh - 50px);
+  flex-direction: column;
+  padding: 24px clamp(18px, 3vw, 40px) 32px;
+}
+
+.header {
+  display: flex;
+  width: 100%;
+  max-width: 1600px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin: 0 auto 20px;
+  gap: 16px;
+}
+
+.header h1 {
+  margin: 0;
+  color: hsl(var(--gray-12));
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.header p {
+  margin: 5px 0 0;
+  color: hsl(var(--gray-10));
+  font-size: 13px;
+}
+
+.workspace {
+  display: grid;
+  overflow: hidden;
+  width: 100%;
+  max-width: 1600px;
+  min-height: 0;
+  flex: 1;
+  border: 1px solid var(--gray-a3);
+  border-radius: 12px;
+  margin: 0 auto;
+  background: hsl(var(--panel));
+  box-shadow: inset 0 1px 0 var(--gray-a2);
+  grid-template-columns: 312px minmax(0, 1fr);
+}
+
+.sidebar {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  border-right: 1px solid var(--gray-a3);
+  background: var(--gray-a1);
+  overflow-y: auto;
+  scrollbar-color: var(--gray-a5) transparent;
+  scrollbar-width: thin;
+}
+
+.controlSection {
+  padding: 16px;
+  border-bottom: 1px solid var(--gray-a3);
+}
+
+.sectionHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 11px;
+  gap: 10px;
+}
+
+.sectionHeading h2 {
+  margin: 0;
+  color: hsl(var(--gray-12));
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.dropZone {
+  position: relative;
+  display: flex;
+  min-height: 106px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 12px;
+  border: 1px dashed var(--gray-a5);
+  border-radius: 10px;
+  background: var(--gray-a2);
+  color: hsl(var(--gray-11));
+  cursor: pointer;
+  gap: 6px;
+  text-align: center;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
+}
+
+.dropZone:hover,
+.dropZone:focus-within,
+.dropZoneDragging {
+  border-color: hsl(var(--brand));
+  background: hsla(var(--brand), 0.07);
+}
+
+.dropZone > * {
+  pointer-events: none;
+}
+
+.dropZoneFilled {
+  min-height: 82px;
+}
+
+.dropTitle {
+  overflow: hidden;
+  max-width: 100%;
+  color: hsl(var(--gray-12));
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropHint {
+  color: hsl(var(--gray-9));
+  font-size: 10px;
+}
+
+.visuallyHidden {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  margin: -1px;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.errorMessage {
+  margin: 9px 0 0;
+  color: hsl(var(--brand));
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.imageControls {
+  display: grid;
+  margin-top: 0;
+  grid-template-rows: 0fr;
+  transition:
+    grid-template-rows 180ms ease,
+    margin-top 180ms ease;
+}
+
+.imageControlsVisible {
+  margin-top: 14px;
+  grid-template-rows: 1fr;
+}
+
+.imageControlsContent {
+  overflow: hidden;
+  min-height: 0;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity 140ms ease,
+    transform 180ms ease;
+}
+
+.imageControlsVisible .imageControlsContent {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 40ms;
+}
+
+.iconButton {
+  display: inline-flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: hsl(var(--gray-10));
+  cursor: pointer;
+}
+
+.iconButton:hover,
+.iconButton:focus-visible {
+  background: var(--gray-a3);
+  color: hsl(var(--gray-12));
+  outline: none;
+}
+
+.select {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--gray-a4);
+  border-radius: 7px;
+  background: var(--gray-a2);
+  color: hsl(var(--gray-12));
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.select:focus-visible {
+  border-color: var(--gray-a8);
+  box-shadow: 0 0 0 2px var(--gray-a2);
+}
+
+.select optgroup,
+.select option {
+  background: hsl(var(--panel));
+  color: hsl(var(--gray-12));
+}
+
+.subControl,
+.optionRow {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  gap: 10px;
+}
+
+.controlLabel,
+.checkboxRow {
+  color: hsl(var(--gray-10));
+  font-size: 11px;
+}
+
+.colorRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.colorSwatch,
+.backgroundSwatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--gray-a5);
+  border-radius: 50%;
+  cursor: pointer;
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.colorSwatch:hover,
+.backgroundSwatch:hover {
+  transform: scale(1.08);
+}
+
+.colorSwatchSelected,
+.backgroundSwatchSelected {
+  box-shadow:
+    0 0 0 2px hsl(var(--panel)),
+    0 0 0 3px hsl(var(--gray-11));
+}
+
+.toggleButton,
+.segmentButton {
+  display: inline-flex;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 9px;
+  border: 1px solid var(--gray-a4);
+  border-radius: 7px;
+  background: var(--gray-a2);
+  color: hsl(var(--gray-11));
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  gap: 5px;
+}
+
+.toggleButton:hover,
+.toggleButton:focus-visible,
+.segmentButton:hover,
+.segmentButton:focus-visible {
+  border-color: var(--gray-a7);
+  color: hsl(var(--gray-12));
+  outline: none;
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  margin-top: 13px;
+  cursor: pointer;
+  gap: 7px;
+}
+
+.checkboxRow input {
+  accent-color: hsl(var(--brand));
+}
+
+.segmentedControl {
+  display: grid;
+  padding: 3px;
+  border: 1px solid var(--gray-a4);
+  border-radius: 8px;
+  background: var(--gray-a2);
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.segmentButton {
+  height: 26px;
+  border: 0;
+  background: transparent;
+}
+
+.segmentButtonActive {
+  background: var(--gray-a4);
+  color: hsl(var(--gray-12));
+}
+
+.positionRow {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.zoomValue {
+  color: hsl(var(--gray-11));
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.resetViewButton {
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--gray-a4);
+  border-radius: 7px;
+  background: var(--gray-a2);
+  color: hsl(var(--gray-11));
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+}
+
+.resetViewButton:hover,
+.resetViewButton:focus-visible {
+  border-color: var(--gray-a7);
+  color: hsl(var(--gray-12));
+  outline: none;
+}
+
+.resetViewButton:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.positionHint {
+  margin: 8px 0 0;
+  color: hsl(var(--gray-9));
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.imageControlsBody .positionHint {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+}
+
+.backgroundGrid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.backgroundControls {
+  margin-top: 14px;
+}
+
+.customColorTrigger {
+  display: inline-flex;
+  height: 24px;
+  align-items: center;
+  padding: 0 6px 0 8px;
+  border: 1px dashed var(--gray-a5);
+  border-radius: 999px;
+  background: transparent;
+  color: hsl(var(--gray-10));
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.customColorTrigger:hover,
+.customColorTrigger:focus-visible,
+.customColorTriggerSelected {
+  border-color: var(--gray-a8);
+  color: hsl(var(--gray-12));
+  outline: none;
+}
+
+.customColorTriggerIcon,
+.customColorTriggerSwatch {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--gray-a6);
+  border-radius: 50%;
+  color: hsl(var(--gray-11));
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.customColorTriggerSwatch {
+  background: var(--gray-a3);
+  background-clip: padding-box;
+}
+
+.customColorPlusIcon {
+  width: 12px;
+  height: 12px;
+}
+
+.customColorPopover {
+  position: fixed;
+  z-index: 20;
+  width: min(230px, 100%);
+  max-height: calc(100dvh - 24px);
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid var(--gray-a5);
+  border-radius: 9px;
+  background: hsl(var(--panel));
+  box-shadow: 0 12px 28px rgb(0 0 0 / 0.32);
+  overflow-y: auto;
+}
+
+.customColorPopoverHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: hsl(var(--gray-12));
+  cursor: grab;
+  font-size: 11px;
+  touch-action: none;
+  user-select: none;
+}
+
+.customColorPopoverDragging .customColorPopoverHeader {
+  cursor: grabbing;
+}
+
+.customColorClose {
+  display: inline-flex;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: hsl(var(--gray-10));
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.customColorClose:hover,
+.customColorClose:focus-visible {
+  background: var(--gray-a3);
+  color: hsl(var(--gray-12));
+  outline: none;
+}
+
+.customColorModes {
+  display: grid;
+  padding: 2px;
+  border: 1px solid var(--gray-a4);
+  border-radius: 7px;
+  margin-top: 8px;
+  background: var(--gray-a2);
+  gap: 2px;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.customColorMode {
+  height: 22px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: hsl(var(--gray-10));
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+}
+
+.customColorMode:hover,
+.customColorMode:focus-visible,
+.customColorModeActive {
+  background: var(--gray-a4);
+  color: hsl(var(--gray-12));
+  outline: none;
+}
+
+.gradientOptions {
+  margin-top: 8px;
+}
+
+.gradientPreview {
+  width: 100%;
+  height: 16px;
+  border: 1px solid var(--gray-a4);
+  border-radius: 5px;
+  margin-bottom: 8px;
+  background-clip: padding-box;
+}
+
+.gradientStops {
+  display: grid;
+  align-items: center;
+  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+.gradientStop {
+  display: flex;
+  width: 100%;
+  height: 28px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px 0 8px;
+  border: 1px solid var(--gray-a5);
+  border-radius: 6px;
+  background: var(--gray-a2);
+  color: hsl(var(--gray-10));
+  cursor: pointer;
+  font: inherit;
+  font-size: 9px;
+  gap: 6px;
+}
+
+.gradientStop:hover,
+.gradientStop:focus-visible,
+.gradientStopActive {
+  border-color: var(--gray-a8);
+  box-shadow: inset 0 0 0 1px var(--gray-a2);
+  outline: none;
+}
+
+.gradientStopSwatch {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  border: 1px solid var(--gray-a5);
+  border-radius: 4px;
+}
+
+.gradientStopsArrow {
+  color: hsl(var(--gray-9));
+  font-size: 14px;
+  line-height: 1;
+}
+
+.gradientAngle {
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+  color: hsl(var(--gray-10));
+  font-size: 9px;
+  gap: 4px;
+}
+
+.gradientAngle > span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.gradientAngle output {
+  color: hsl(var(--gray-11));
+  font-variant-numeric: tabular-nums;
+}
+
+.gradientAngle input {
+  width: 100%;
+  accent-color: hsl(var(--brand));
+  cursor: pointer;
+}
+
+.customColorFields {
+  display: flex;
+  align-items: flex-end;
+  margin-top: 8px;
+  gap: 9px;
+}
+
+.customColorArea {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 92px;
+  border-radius: 6px;
+  margin-top: 8px;
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.customColorArea:focus-visible,
+.customColorHue:focus-visible {
+  box-shadow: 0 0 0 2px var(--gray-a5);
+  outline: none;
+}
+
+.customColorAreaCursor,
+.customColorHueCursor {
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.customColorAreaCursor {
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--gray-a5);
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px rgb(255 255 255 / 0.85);
+  transform: translate(-50%, -50%);
+}
+
+.customColorHue {
+  position: relative;
+  width: 100%;
+  height: 9px;
+  border-radius: 999px;
+  margin-top: 6px;
+  background: linear-gradient(
+    to right,
+    #f00 0%,
+    #ff0 16.67%,
+    #0f0 33.33%,
+    #0ff 50%,
+    #00f 66.67%,
+    #f0f 83.33%,
+    #f00 100%
+  );
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.customColorHueCursor {
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border: 2px solid hsl(var(--gray-12));
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: 0 0 0 1px hsl(var(--panel));
+  transform: translate(-50%, -50%);
+}
+
+.customColorPreview {
+  width: 42px;
+  height: 28px;
+  flex: 0 0 auto;
+  border: 1px solid var(--gray-a5);
+  border-radius: 6px;
+}
+
+.hexField {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  color: hsl(var(--gray-9));
+  font-size: 9px;
+  gap: 4px;
+}
+
+.hexField input {
+  width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--gray-a4);
+  border-radius: 6px;
+  background: var(--gray-a2);
+  color: hsl(var(--gray-12));
+  font: inherit;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+
+.hexField input:focus {
+  border-color: var(--gray-a8);
+  box-shadow: 0 0 0 2px var(--gray-a2);
+}
+
+.previewColumn {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  background: hsl(var(--gray-1));
+}
+
+.canvasViewport {
+  position: relative;
+  overflow: hidden;
+  min-height: 500px;
+  flex: 1;
+}
+
+.canvasPreview {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform-origin: center;
+}
+
+.canvas {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--canvas-radius, 10px);
+  background: #000;
+  background-clip: border-box;
+  isolation: isolate;
+}
+
+.canvasResizeHandles {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.canvasResizeHandles::before {
+  position: absolute;
+  border: 1px solid hsl(var(--gray-5));
+  border-radius: var(--canvas-radius, 10px);
+  content: "";
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+
+.canvasResizeHandle {
+  position: absolute;
+  z-index: 1;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+  pointer-events: auto;
+  transition: opacity 120ms ease;
+}
+
+.canvasResizeHandle::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.4);
+  content: "";
+  transform: translate(-50%, -50%);
+}
+
+.canvasPreview:hover .canvasResizeHandle,
+.canvasPreview:focus-within .canvasResizeHandle {
+  opacity: 1;
+}
+
+.canvasPreview:hover .canvasResizeHandles::before,
+.canvasPreview:focus-within .canvasResizeHandles::before {
+  opacity: 1;
+}
+
+.canvasResizeHandle:focus-visible {
+  outline: 2px solid hsl(var(--brand));
+  outline-offset: 2px;
+}
+
+.canvasResizeHandleTop,
+.canvasResizeHandleBottom {
+  left: 50%;
+  cursor: ns-resize;
+}
+
+.canvasResizeHandleLeft,
+.canvasResizeHandleRight {
+  top: 50%;
+  cursor: ew-resize;
+}
+
+.canvasResizeHandleTop {
+  top: 0;
+  transform: translate(-50%, -50%) scale(var(--handle-scale));
+}
+
+.canvasResizeHandleRight {
+  right: 0;
+  transform: translate(50%, -50%) scale(var(--handle-scale));
+}
+
+.canvasResizeHandleBottom {
+  bottom: 0;
+  transform: translate(-50%, 50%) scale(var(--handle-scale));
+}
+
+.canvasResizeHandleLeft {
+  left: 0;
+  transform: translate(-50%, -50%) scale(var(--handle-scale));
+}
+
+.canvasViewport.canvasTransparent {
+  background-color: #f8f8f8;
+  background-image: linear-gradient(45deg, #d9d9d9 25%, transparent 25%),
+    linear-gradient(-45deg, #d9d9d9 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #d9d9d9 75%),
+    linear-gradient(-45deg, transparent 75%, #d9d9d9 75%);
+  background-position:
+    0 0,
+    0 5px,
+    5px -5px,
+    -5px 0;
+  background-size: 10px 10px;
+}
+
+.canvasLabel {
+  position: absolute;
+  z-index: 2;
+  top: 27px;
+  left: 27px;
+  padding: 5px 8px;
+  border: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: 6px;
+  background: rgb(23 24 28 / 0.88);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.18);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  pointer-events: none;
+  text-transform: uppercase;
+}
+
+.frameCenter {
+  position: absolute;
+  display: grid;
+  inset: 0;
+  place-items: center;
+}
+
+.frameRenderer {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center;
+  transition: transform 160ms ease;
+}
+
+.frameCapture {
+  display: inline-flex;
+  padding: 6px;
+}
+
+.deviceFrame:global(.mockframe) :global(.screen) {
+  background-color: transparent;
+}
+
+.deviceFrame:global(.mockframe) {
+  container-type: size;
+}
+
+.deviceFrameDragging:global(.mockframe) :global(.screen),
+.deviceFrameDragging:global(.mockframe) :global(.overflow),
+.screenImageDragging {
+  overflow: visible !important;
+}
+
+.deviceFrame:global(.mockframe),
+.deviceFrame:global(.mockframe)::before,
+.deviceFrame:global(.mockframe)::after,
+.deviceFrame:global(.mockframe) :global(*),
+.deviceFrame:global(.mockframe) :global(*)::before,
+.deviceFrame:global(.mockframe) :global(*)::after {
+  box-shadow: none !important;
+}
+
+.deviceFrame:global(.mockframe) :global(.shadow) {
+  display: none;
+}
+
+.screenImageViewport {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  cursor: grab;
+  touch-action: none;
+}
+
+.screenImageDragging {
+  cursor: grabbing;
+}
+
+.screenImageClip {
+  position: relative;
+  z-index: 1;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.screenImage {
+  position: absolute;
+  display: block;
+  max-width: none;
+  max-height: none;
+  pointer-events: none;
+  user-select: none;
+}
+
+.screenImageGhost {
+  position: absolute;
+  z-index: 0;
+  display: block;
+  max-width: none;
+  max-height: none;
+  opacity: 0.25;
+  pointer-events: none;
+  user-select: none;
+}
+
+.screenPlaceholder {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #24252a;
+  color: hsl(var(--gray-9));
+  font-size: clamp(12px, 3cqmin, 24px);
+  gap: 8px;
+}
+
+.screenPlaceholderHint {
+  max-width: 80%;
+  color: hsl(var(--gray-10));
+  font-size: clamp(10px, 2.5cqmin, 20px);
+  line-height: 1.35;
+  text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .imageControls,
+  .imageControlsContent {
+    transition: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .container {
+    padding: 18px 16px 24px;
+  }
+
+  .workspace {
+    overflow: visible;
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    overflow: visible;
+    max-height: none;
+    border-right: 0;
+    border-bottom: 1px solid var(--gray-a3);
+  }
+
+  .previewColumn {
+    min-height: 540px;
+  }
+}
+
+@media (max-width: 560px) {
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .previewColumn {
+    min-height: 460px;
+  }
+
+  .canvasLabel {
+    top: 21px;
+    left: 21px;
+  }
+
+  .canvas {
+    min-height: 430px;
+  }
+}

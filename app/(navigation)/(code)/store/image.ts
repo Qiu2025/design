@@ -10,10 +10,6 @@ export const SIZE_LABELS = {
 
 export type ExportSize = (typeof EXPORT_SIZE_OPTIONS)[number];
 
-export function isExportSize(value: ExportSize | unknown): value is ExportSize {
-  return EXPORT_SIZE_OPTIONS.indexOf(value as ExportSize) !== -1;
-}
-
 const exportSizeAtom = atomWithStorage<ExportSize>("size", EXPORT_SIZE_OPTIONS[1]);
 
 export { exportSizeAtom };

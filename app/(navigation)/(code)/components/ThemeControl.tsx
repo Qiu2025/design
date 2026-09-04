@@ -1,6 +1,6 @@
 import { useAtom } from "jotai";
 import React, { useEffect, useMemo } from "react";
-import { themeAtom, THEMES, Theme, unlockedThemesAtom } from "../store/themes";
+import { themeAtom, THEMES, Theme } from "../store/themes";
 import ControlContainer from "./ControlContainer";
 
 import styles from "./ThemeControl.module.css";
@@ -14,7 +14,6 @@ import {
   ComboboxGroup,
   ComboboxGroupLabel,
   ComboboxItem,
-  ComboboxSeparator,
   ComboboxValue,
   ComboboxEmpty,
 } from "@/components/combobox";
@@ -48,7 +47,6 @@ function ThemePreview({ theme }: { theme: Theme }) {
 const ThemeControl: React.FC = () => {
   const [currentTheme, atomSetTheme] = useAtom(themeAtom);
   const [padding, setPadding] = useAtom(paddingAtom);
-  const [unlockedThemes, setUnlockedThemes] = useAtom(unlockedThemesAtom);
 
   const setTheme = (theme: Theme) => {
     atomSetTheme(theme);
@@ -60,13 +58,13 @@ const ThemeControl: React.FC = () => {
   };
 
   useEffect(() => {
-    if (currentTheme.name === THEMES.vercel.name || currentTheme.name === THEMES.rabbit.name) {
+    if (currentTheme.name === THEMES.vercel.name) {
       setPadding(64);
     }
   }, [currentTheme, setPadding]);
 
   useHotkeys("c", () => {
-    const availableThemes = Object.values(THEMES).filter((theme) => unlockedThemes.includes(theme.id) || !theme.hidden);
+    const availableThemes = Object.values(THEMES);
     const currentIndex = availableThemes.indexOf(currentTheme);
     if (Object.values(availableThemes)[currentIndex + 1]) {
       setTheme(Object.values(availableThemes)[currentIndex + 1]);
@@ -92,20 +90,12 @@ const ThemeControl: React.FC = () => {
     [],
   );
 
-  const filteredPartnerThemes = useMemo(
-    () =>
-      partnerThemes.filter(
-        (theme) => unlockedThemes.includes(theme.id) || !theme.hidden || theme.name === currentTheme.name,
-      ),
-    [partnerThemes, unlockedThemes, currentTheme.name],
-  );
-
   const groupedItems: ThemeGroup[] = useMemo(
     () => [
-      { label: "Partners", items: filteredPartnerThemes },
+      { label: "Brand Themes", items: partnerThemes },
       { label: "Themes", items: themes },
     ],
-    [filteredPartnerThemes, themes],
+    [partnerThemes, themes],
   );
 
   return (
@@ -124,13 +114,13 @@ const ThemeControl: React.FC = () => {
         <ComboboxTrigger size="small" className="w-[60px]" icon={ChevronUpIcon}>
           <ComboboxValue<Theme>>{(value) => (value ? <ThemePreview theme={value} /> : "Select theme")}</ComboboxValue>
         </ComboboxTrigger>
-        <ComboboxContent showSearchIcon>
+        <ComboboxContent showSearchIcon className="w-[min(25rem,calc(100vw-2rem))] [&_input]:w-full">
           <ComboboxEmpty>No themes found.</ComboboxEmpty>
-          <ComboboxList<ThemeGroup>>
+          <ComboboxList<ThemeGroup> className="grid grid-cols-[minmax(0,1fr)_1px_minmax(0,1fr)] p-2">
             {(group, groupIndex) => (
               <React.Fragment key={group.label}>
-                {groupIndex > 0 && <ComboboxSeparator />}
-                <ComboboxGroup items={group.items}>
+                {groupIndex > 0 && <div aria-hidden className="bg-gray-4" />}
+                <ComboboxGroup items={group.items} className={groupIndex > 0 ? "min-w-0 pl-2" : "min-w-0 pr-2"}>
                   <ComboboxGroupLabel>{group.label}</ComboboxGroupLabel>
                   {group.items.map((theme) => (
                     <ComboboxItem key={theme.id} value={theme}>

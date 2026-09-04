@@ -1,8 +1,8 @@
 import OgImage from "./og-image.png";
 import { Metadata } from "next";
 
-const title = "SnapBox Components";
-const description = "Component playground for the SnapBox ecosystem.";
+const title = "Design Components";
+const description = "Component playground for the Design ecosystem.";
 const ogUrl = OgImage.src;
 
 export const metadata: Metadata = {

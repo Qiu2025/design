@@ -5,9 +5,8 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Install dependencies based on the preferred package manager
-COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* ./
-RUN npm ci 2>/dev/null || npm install
+COPY package*.json ./
+RUN npm ci
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -22,11 +21,10 @@ RUN npm run build
 FROM base AS runner
 WORKDIR /app
 
+RUN apk add --no-cache ffmpeg
+
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV SHLINK_BASE_URL=""
-ENV SHLINK_SHORT_DOMAIN="go.sqiu.dev"
-ENV SHLINK_API_KEY=""
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -48,4 +46,3 @@ ENV PORT=4000
 ENV HOSTNAME="0.0.0.0"
 
 CMD ["node", "server.js"]
-

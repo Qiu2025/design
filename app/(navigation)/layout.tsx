@@ -1,15 +1,14 @@
 import {
   Fira_Code,
   Geist_Mono,
-  Google_Sans_Code,
   IBM_Plex_Mono,
   JetBrains_Mono,
   Roboto_Mono,
   Source_Code_Pro,
   Space_Mono,
 } from "next/font/google";
-import cn from "classnames";
 import { Navigation } from "@/components/navigation";
+import { cn } from "@/utils/cn";
 import localFont from "next/font/local";
 import React from "react";
 
@@ -55,10 +54,11 @@ const sourceCodePro = Source_Code_Pro({
   variable: "--font-source-code-pro",
 });
 
-const googleSansCode = Google_Sans_Code({
-  subsets: ["latin"],
+const googleSansCode = localFont({
+  src: "../assets/google-sans-code.woff2",
   weight: "400",
   display: "swap",
+  adjustFontFallback: false,
   variable: "--font-google-sans-code",
 });
 

@@ -1,25 +1,18 @@
 <h1 align="center">
-  SnapBox
+  Design
 </h1>
 <p align="center">
-  Create beautiful code images and icons.
+  Simple browser tools for creating and preparing digital assets.
 </p>
 
 ## About
 
-This repository contains the source code for [snap.sqiu.dev](https://snap.sqiu.dev), a collection of tools for creating code images and icons. It includes:
+This repository contains the source code for [design.sqiu.dev](https://design.sqiu.dev), a collection of small browser tools. It includes:
 
 - [**Code Images**](</app/(navigation)/(code)>): Create beautiful images of your code.
-- [**Icon Maker**](</app/(navigation)/icon/>): Create beautiful icons for your apps and projects.
-
-## Setup
-
-To get started, clone the repo, install dependencies and run the development server:
-
-```bash
-npm install
-npm run dev
-```
+- [**Icon Maker**](</app/(navigation)/icon/>): Create beautiful icons.
+- [**Mockup Maker**·](</app/(navigation)/mockup/>): Create device mockups from screenshots.
+- [**Metadata Remover**](</app/(navigation)/metadata/>): Remove metadata from images and videos.
 
 ## Credits
 

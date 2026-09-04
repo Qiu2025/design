@@ -1,4 +1,4 @@
-import classNames from "classnames";
+import { cn } from "@/utils/cn";
 import { useAtom, useAtomValue } from "jotai";
 
 import { showBackgroundAtom } from "../../store";
@@ -16,7 +16,7 @@ const SupabaseFrame = () => {
 
   return (
     <div
-      className={classNames(
+      className={cn(
         sharedStyles.frame,
         showBackground && styles.frame,
         !darkMode && styles.frameLightMode,

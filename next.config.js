@@ -1,11 +1,26 @@
 const withBundleAnalyzer = require("@next/bundle-analyzer")({
   enabled: process.env.ANALYZE === "true",
 });
+const { networkInterfaces } = require("node:os");
+
+const localDevOrigins = Object.values(networkInterfaces())
+  .flatMap((addresses) => addresses ?? [])
+  .filter(({ internal }) => !internal)
+  .map(({ address }) => address);
 
 /** @type {import('next').NextConfig} */
 
 const nextConfig = {
+  allowedDevOrigins: localDevOrigins,
+  devIndicators: false,
   output: "standalone",
+  outputFileTracingIncludes: {
+    "/api/metadata/assets/*": [
+      "./node_modules/@6over3/zeroperl-ts/dist/esm/zeroperl.wasm",
+      "./node_modules/@ffmpeg/core/dist/umd/ffmpeg-core.js",
+      "./node_modules/@ffmpeg/core/dist/umd/ffmpeg-core.wasm",
+    ],
+  },
   reactStrictMode: true,
   transpilePackages: ["highlight.js"],
   experimental: {
@@ -55,41 +70,16 @@ const nextConfig = {
       },
     },
   },
-  async rewrites() {
-    return {
-      fallback: [
-        {
-          source: "/:path*",
-          destination: "https://go.sqiu.dev/:path*",
-        },
-      ],
-    };
-  },
-  async redirects() {
-    return [
-      {
-        source: "/:path*",
-        has: [
-          {
-            type: "host",
-            value: "icon.snap.sqiu.dev",
-          },
-        ],
-        destination: "https://snap.sqiu.dev/icon/:path*",
-        permanent: true,
-      },
-      {
-        source: "/:path*",
-        has: [
-          {
-            type: "host",
-            value: "icons.snap.sqiu.dev",
-          },
-        ],
-        destination: "https://snap.sqiu.dev/icon/:path*",
-        permanent: true,
-      },
-    ];
+  webpack(config, { isServer, webpack }) {
+    if (!isServer) {
+      config.plugins.push(
+        new webpack.IgnorePlugin({
+          resourceRegExp: /^node:fs\/promises$/,
+        }),
+      );
+    }
+
+    return config;
   },
   async headers() {
     return [
