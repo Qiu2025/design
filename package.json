@@ -36,7 +36,7 @@
     "highlight.js": "^11.7.0",
     "hotkeys-js": "^3.10.0",
     "html-react-parser": "^5.2.2",
-    "html-to-image": "^1.11.3",
+    "html-to-image": "^1.11.13",
     "jotai": "^2.8.3",
     "js-base64": "^3.7.3",
     "next": "16.3.2",
