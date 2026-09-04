@@ -268,3 +268,13 @@ svg {
   -ms-overflow-style: none; /* IE and Edge */
   scrollbar-width: none; /* Firefox */
 }
+
+@media (hover: none), (pointer: coarse) {
+  .shortcutDialogGrid {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .nonDesktopOnly {
+    display: none !important;
+  }
+}

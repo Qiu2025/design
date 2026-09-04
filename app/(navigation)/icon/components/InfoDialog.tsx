@@ -20,7 +20,7 @@ export function InfoDialog() {
         </Button>
       </DialogTrigger>
       <DialogContent size="large">
-        <div className="grid gap-8 md:grid-cols-2">
+        <div className="shortcutDialogGrid grid gap-8 md:grid-cols-2">
           <div className="flex flex-col gap-3 text-[13px] text-gray-11 leading-relaxed">
             <DialogTitle>About</DialogTitle>
             <DialogDescription className="text-[13px] text-gray-11 leading-relaxed">
@@ -40,7 +40,7 @@ export function InfoDialog() {
             </a>
           </div>
 
-          <div className="flex flex-col gap-2">
+          <div className="nonDesktopOnly flex flex-col gap-2">
             <h2 className="font-medium -mt-[3px]">Shortcuts</h2>
             <div className="flex flex-col gap-4">
               <Shortcut keys={["⌘", "Z"]}>Undo action</Shortcut>

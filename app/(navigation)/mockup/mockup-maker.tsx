@@ -1278,7 +1278,7 @@ export function MockupMaker() {
                         Reset view
                       </button>
                     </div>
-                    <p className={styles.positionHint}>
+                    <p className={`${styles.positionHint} nonDesktopOnly`}>
                       Scroll to zoom or drag to reposition.
                       <br />
                       Hold Shift for finer control.
