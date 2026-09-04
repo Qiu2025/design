@@ -846,24 +846,6 @@
   background-size: 10px 10px;
 }
 
-.canvasLabel {
-  position: absolute;
-  z-index: 2;
-  top: 27px;
-  left: 27px;
-  padding: 5px 8px;
-  border: 1px solid rgb(255 255 255 / 0.14);
-  border-radius: 6px;
-  background: rgb(23 24 28 / 0.88);
-  box-shadow: 0 4px 12px rgb(0 0 0 / 0.18);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.06em;
-  pointer-events: none;
-  text-transform: uppercase;
-}
-
 .frameCenter {
   position: absolute;
   display: grid;
@@ -1015,11 +997,6 @@
 
   .previewColumn {
     min-height: 460px;
-  }
-
-  .canvasLabel {
-    top: 21px;
-    left: 21px;
   }
 
   .canvas {

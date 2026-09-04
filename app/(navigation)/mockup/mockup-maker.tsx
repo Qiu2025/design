@@ -1624,7 +1624,6 @@ export function MockupMaker() {
           </aside>
 
           <section className={styles.previewColumn} aria-label="Mockup preview">
-            <div className={styles.canvasLabel}>Preview</div>
             <div
               ref={previewRef}
               className={cn(styles.canvasViewport, exportDeviceOnly && styles.canvasTransparent)}
