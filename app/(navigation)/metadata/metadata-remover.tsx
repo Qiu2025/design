@@ -169,6 +169,8 @@ export function MetadataRemover() {
   const selectedCount = selectedMetadata.size;
   const removableEntries = useMemo(() => metadataEntries.filter((entry) => !entry.protected), [metadataEntries]);
   const protectedCount = metadataEntries.length - removableEntries.length;
+  const recommendedCount = useMemo(() => getPresetSelection(metadataEntries, "safe").size, [metadataEntries]);
+  const hasDistinctPresets = recommendedCount !== removableEntries.length;
   const serverTooLarge = Boolean(file && file.size > MAX_SERVER_VIDEO_BYTES);
   const duplicateMetadataLabels = useMemo(() => {
     const counts = new Map<string, number>();
@@ -198,6 +200,15 @@ export function MetadataRemover() {
     filteredEntries.forEach((entry) => groups.set(entry.group, [...(groups.get(entry.group) || []), entry]));
     return Array.from(groups.entries()).sort((a, b) => compareMetadataGroups(a[0], b[0]));
   }, [filteredEntries]);
+
+  const visibleRemovableGroups = useMemo(
+    () =>
+      groupedEntries
+        .map(([group, entries]) => [group, entries.filter((entry) => !entry.protected)] as const)
+        .filter(([, entries]) => entries.length > 0),
+    [groupedEntries],
+  );
+  const visibleProtectedEntries = useMemo(() => filteredEntries.filter((entry) => entry.protected), [filteredEntries]);
 
   const metadataGroups = useMemo(() => {
     const groups = new Map<string, MetadataEntry[]>();
@@ -604,7 +615,7 @@ export function MetadataRemover() {
           onClick={removeSelectedMetadata}
           disabled={isBusy || !file || selectedCount === 0 || (processingLocation === "server" && serverTooLarge)}
           variant="primary"
-          className={styles.cleanButton}
+          className={cn(styles.cleanButton, styles.desktopOnly)}
           aria-label={isCleaning ? "Cleaning file" : "Clean file"}
           aria-busy={isCleaning}
         >
@@ -620,7 +631,11 @@ export function MetadataRemover() {
             <div className={styles.workflowControls}>
               <div className={styles.panelHeading}>
                 <h2 id="file-panel-title">File</h2>
-                <div className={styles.modeToggle} role="group" aria-label="File type">
+                <div
+                  className={cn(styles.modeToggle, file && styles.modeToggleAfterSelection)}
+                  role="group"
+                  aria-label="File type"
+                >
                   <button
                     type="button"
                     onClick={() => changeMode("image")}
@@ -806,9 +821,12 @@ export function MetadataRemover() {
               )}
 
               {file && metadataEntries.length > 0 && removableEntries.length > 0 && !isBusy && (
-                <section className={styles.cleaningControls} aria-labelledby="cleaning-level-title">
+                <section
+                  className={cn(styles.cleaningControls, styles.desktopOnly)}
+                  aria-labelledby="desktop-cleaning-level-title"
+                >
                   <div className={styles.sectionHeading}>
-                    <h3 id="cleaning-level-title">Cleaning level</h3>
+                    <h3 id="desktop-cleaning-level-title">Cleaning level</h3>
                     {preset === "custom" && <span className={styles.customBadge}>Custom</span>}
                   </div>
                   <div className={styles.presetButtons} role="group" aria-label="Cleaning level">
@@ -832,7 +850,14 @@ export function MetadataRemover() {
                 </section>
               )}
 
-              {(hasNothingToClean || hasNoDetectedMetadata) && (
+              {hasNothingToClean && (
+                <div className={cn(styles.feedback, styles.feedbackSuccess, styles.desktopOnly)} role="status">
+                  <CheckCircleIcon className={cn("h-4 w-4", styles.feedbackIcon)} />
+                  This file already appears clean
+                </div>
+              )}
+
+              {hasNoDetectedMetadata && (
                 <div className={cn(styles.feedback, styles.feedbackSuccess)} role="status">
                   <CheckCircleIcon className={cn("h-4 w-4", styles.feedbackIcon)} />
                   This file already appears clean
@@ -852,7 +877,7 @@ export function MetadataRemover() {
             </div>
 
             {showWorkbench && metadataGroups.length > 0 && (
-              <nav className={styles.groupRail} aria-label="Metadata groups">
+              <nav className={cn(styles.groupRail, styles.desktopOnly)} aria-label="Metadata groups">
                 <span className={styles.groupRailTitle}>Groups</span>
                 <div className={styles.groupList}>
                   {metadataGroups.map(([group, entries]) => (
@@ -978,7 +1003,7 @@ export function MetadataRemover() {
                 </section>
               )}
 
-              <section className={styles.metadataPanel} aria-labelledby="metadata-panel-title">
+              <section className={cn(styles.metadataPanel, styles.desktopOnly)} aria-labelledby="metadata-panel-title">
                 <div className={styles.metadataHeader}>
                   <div>
                     <h2 id="metadata-panel-title">Metadata</h2>
@@ -1143,6 +1168,313 @@ export function MetadataRemover() {
                   </footer>
                 )}
               </section>
+
+              <div className={styles.mobileFlow}>
+                {metadataEntries.length > 0 && (
+                  <section className={styles.cleaningPanel} aria-labelledby="mobile-inspection-result-title">
+                    <div className={styles.inspectionSummary}>
+                      <span className={styles.inspectionSummaryIcon} aria-hidden="true">
+                        <CheckCircleIcon />
+                      </span>
+                      <div>
+                        <h2 id="mobile-inspection-result-title">
+                          {removableEntries.length === 0
+                            ? "This file already appears clean"
+                            : `${removableEntries.length} removable ${removableEntries.length === 1 ? "field" : "fields"} found`}
+                        </h2>
+                        <p>
+                          {protectedCount > 0
+                            ? `${protectedCount} required ${protectedCount === 1 ? "field" : "fields"} will be kept so the file continues to work.`
+                            : "No required fields need to be preserved."}
+                        </p>
+                      </div>
+                    </div>
+
+                    {removableEntries.length > 0 && (
+                      <section className={styles.cleaningControls} aria-labelledby="mobile-cleaning-level-title">
+                        <div className={styles.sectionHeading}>
+                          <h3 id="mobile-cleaning-level-title">Cleaning level</h3>
+                          {preset === "custom" && <span className={styles.customBadge}>Custom</span>}
+                        </div>
+                        <div
+                          className={cn(styles.presetButtons, !hasDistinctPresets && styles.presetButtonsSingle)}
+                          role="group"
+                          aria-label="Cleaning level"
+                        >
+                          <button
+                            type="button"
+                            className={cn(styles.presetButton, preset === "safe" && styles.presetButtonActive)}
+                            onClick={() => applyPreset("safe")}
+                            aria-pressed={preset === "safe"}
+                            disabled={isBusy}
+                          >
+                            <span className={styles.presetCopy}>
+                              <strong>Recommended</strong>
+                              <span>
+                                {hasDistinctPresets
+                                  ? "Remove privacy-sensitive metadata"
+                                  : "Remove all metadata that can be safely cleaned"}
+                              </span>
+                            </span>
+                            <span className={styles.presetCount}>{recommendedCount}</span>
+                          </button>
+                          {hasDistinctPresets && (
+                            <button
+                              type="button"
+                              className={cn(styles.presetButton, preset === "maximum" && styles.presetButtonActive)}
+                              onClick={() => applyPreset("maximum")}
+                              aria-pressed={preset === "maximum"}
+                              disabled={isBusy}
+                            >
+                              <span className={styles.presetCopy}>
+                                <strong>Maximum</strong>
+                                <span>Remove every non-required field</span>
+                              </span>
+                              <span className={styles.presetCount}>{removableEntries.length}</span>
+                            </button>
+                          )}
+                        </div>
+                      </section>
+                    )}
+                  </section>
+                )}
+
+                {metadataEntries.length > 0 ? (
+                  <section className={styles.metadataPanel} aria-labelledby="mobile-metadata-panel-title">
+                    <details key={inspectionRevision} className={styles.reviewDisclosure}>
+                      <summary className={styles.reviewSummary}>
+                        <span className={styles.reviewSummaryCopy}>
+                          <span id="mobile-metadata-panel-title" className={styles.reviewTitle}>
+                            Review and customize
+                          </span>
+                          <span className={styles.reviewCount}>
+                            {selectedCount} of {removableEntries.length} selected
+                          </span>
+                        </span>
+                        <ChevronRightIcon className={styles.reviewChevron} aria-hidden="true" />
+                      </summary>
+
+                      <div className={styles.reviewBody}>
+                        {removableEntries.length > 10 && (
+                          <div className={styles.metadataHeader}>
+                            <span>Search fields and values</span>
+                            <Input
+                              value={metadataQuery}
+                              onChange={(event) => setMetadataQuery(event.target.value)}
+                              placeholder="Search metadata"
+                              aria-label="Search metadata fields or values"
+                              variant="soft"
+                              className={styles.metadataSearch}
+                              disabled={isBusy}
+                            >
+                              <InputSlot side="left">
+                                <MagnifyingGlassIcon className="h-4 w-4" />
+                              </InputSlot>
+                            </Input>
+                          </div>
+                        )}
+
+                        <div className={styles.metadataBrowser}>
+                          <div className={styles.metadataContent}>
+                            <div className={styles.metadataScroll}>
+                              <div className={styles.metadataScrollInner}>
+                                {visibleRemovableGroups.length > 0 || visibleProtectedEntries.length > 0 ? (
+                                  <>
+                                    {visibleRemovableGroups.map(([group, entries]) => (
+                                      <section key={group} className={styles.metadataGroup}>
+                                        <div className={styles.metadataGroupHeader}>
+                                          <div className={styles.metadataGroupTitle}>
+                                            <h3>{group}</h3>
+                                            <span>
+                                              {entries.length} {entries.length === 1 ? "field" : "fields"}
+                                            </span>
+                                          </div>
+                                          <div className={styles.metadataGroupActions}>
+                                            <button
+                                              type="button"
+                                              onClick={() => selectGroup(entries, true)}
+                                              className={styles.metadataGroupButton}
+                                              disabled={isBusy}
+                                            >
+                                              Select all
+                                            </button>
+                                            <button
+                                              type="button"
+                                              onClick={() => selectGroup(entries, false)}
+                                              className={styles.metadataGroupButton}
+                                              disabled={isBusy}
+                                            >
+                                              Clear
+                                            </button>
+                                          </div>
+                                        </div>
+                                        <div className={styles.metadataList}>
+                                          {entries.map((entry) => (
+                                            <label
+                                              key={entry.id}
+                                              className={cn(
+                                                styles.metadataRow,
+                                                selectedMetadata.has(entry.id) && styles.metadataRowSelected,
+                                              )}
+                                            >
+                                              <input
+                                                type="checkbox"
+                                                checked={selectedMetadata.has(entry.id)}
+                                                disabled={isBusy}
+                                                onChange={() => toggleMetadataSelection(entry)}
+                                                className={styles.metadataCheckbox}
+                                              />
+                                              <span className={styles.metadataField}>
+                                                <span className={styles.metadataKey}>{entry.label}</span>
+                                                {duplicateMetadataLabels.has(normalizeMetadataLabel(entry.label)) && (
+                                                  <span className={styles.metadataOrigin}>{entry.sourceLabel}</span>
+                                                )}
+                                              </span>
+                                              <span className={styles.metadataValue} title={entry.value}>
+                                                {entry.value}
+                                              </span>
+                                            </label>
+                                          ))}
+                                        </div>
+                                      </section>
+                                    ))}
+
+                                    {visibleProtectedEntries.length > 0 && (
+                                      <details className={styles.protectedDisclosure}>
+                                        <summary className={styles.protectedSummary}>
+                                          <span className={styles.protectedSummaryIcon} aria-hidden="true">
+                                            <LockIcon />
+                                          </span>
+                                          <span className={styles.protectedSummaryCopy}>
+                                            <strong>Required fields kept</strong>
+                                            <span>Needed for playback or display</span>
+                                          </span>
+                                          <span className={styles.protectedCount}>
+                                            {visibleProtectedEntries.length}
+                                          </span>
+                                          <ChevronRightIcon className={styles.protectedChevron} aria-hidden="true" />
+                                        </summary>
+                                        <div className={styles.metadataList}>
+                                          {visibleProtectedEntries.map((entry) => (
+                                            <div
+                                              key={entry.id}
+                                              className={cn(styles.metadataRow, styles.metadataRowProtected)}
+                                            >
+                                              <span
+                                                className={styles.metadataProtectedControl}
+                                                title={entry.protectionReason}
+                                                role="img"
+                                                aria-label={
+                                                  entry.protectionReason
+                                                    ? `Protected metadata: ${entry.protectionReason}`
+                                                    : "Protected metadata"
+                                                }
+                                              >
+                                                <LockIcon aria-hidden="true" />
+                                              </span>
+                                              <span className={styles.metadataField}>
+                                                <span className={styles.metadataKey}>{entry.label}</span>
+                                                {duplicateMetadataLabels.has(normalizeMetadataLabel(entry.label)) && (
+                                                  <span className={styles.metadataOrigin}>{entry.sourceLabel}</span>
+                                                )}
+                                              </span>
+                                              <span className={styles.metadataValue} title={entry.value}>
+                                                {entry.value}
+                                              </span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </details>
+                                    )}
+                                  </>
+                                ) : (
+                                  <div className={styles.noResults}>No matching metadata</div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </details>
+                  </section>
+                ) : (
+                  <section className={styles.metadataPanel}>
+                    <div className={styles.emptyMetadata} role="status" aria-live="polite">
+                      <div className={styles.emptyMetadataIcon}>
+                        {isBusy ? (
+                          <div className={styles.spinner} />
+                        ) : mode === "image" ? (
+                          <ImageIcon className="h-5 w-5" />
+                        ) : (
+                          <FilmStripIcon className="h-5 w-5" />
+                        )}
+                      </div>
+                      <p>
+                        {!file
+                          ? "Select a file to begin"
+                          : isBusy
+                            ? processingState === "uploading"
+                              ? "Uploading file…"
+                              : "Inspecting metadata…"
+                            : waitingForServerInspection
+                              ? serverTooLarge
+                                ? "Server limit exceeded"
+                                : "Inspect the file to continue"
+                              : metadataError
+                                ? "Metadata unavailable"
+                                : inspectionComplete
+                                  ? "No metadata found"
+                                  : "Ready to inspect"}
+                      </p>
+                    </div>
+                  </section>
+                )}
+
+                {metadataEntries.length > 0 && removableEntries.length > 0 && (
+                  <div className={styles.cleanActionBar}>
+                    <span
+                      className={cn(styles.selectionStatus, selectedCount > 0 && styles.selectionStatusActive)}
+                      aria-live="polite"
+                      aria-atomic="true"
+                    >
+                      <CheckCircleIcon className={styles.selectionStatusIcon} aria-hidden="true" />
+                      <span className={styles.selectionStatusCopy}>
+                        {selectedCount > 0 ? (
+                          <>
+                            <strong>{selectedCount}</strong>
+                            <span>selected</span>
+                          </>
+                        ) : (
+                          <span>Select a field</span>
+                        )}
+                      </span>
+                    </span>
+                    <Button
+                      type="button"
+                      onClick={removeSelectedMetadata}
+                      disabled={
+                        isBusy || !file || selectedCount === 0 || (processingLocation === "server" && serverTooLarge)
+                      }
+                      variant="primary"
+                      size="large"
+                      className={styles.cleanActionButton}
+                      aria-label={
+                        isCleaning
+                          ? "Cleaning file"
+                          : `Clean ${selectedCount} ${selectedCount === 1 ? "field" : "fields"}`
+                      }
+                      aria-busy={isCleaning}
+                    >
+                      <EraserIcon className="h-4 w-4" />
+                      <span>
+                        {isCleaning
+                          ? "Cleaning…"
+                          : `Clean ${selectedCount} ${selectedCount === 1 ? "field" : "fields"}`}
+                      </span>
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
