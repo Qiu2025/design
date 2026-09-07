@@ -63,7 +63,7 @@
     "eslint-config-next": "16.3.2",
     "husky": "^8.0.3",
     "lint-staged": "^13.1.0",
-    "postcss": "^8.5.26",
+    "postcss": "^8.5.28",
     "postcss-nested": "^6.0.0",
     "stylelint": "^14.11.0",
     "stylelint-config-idiomatic-order": "^9.0.0",
