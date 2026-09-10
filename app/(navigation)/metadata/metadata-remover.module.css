@@ -717,7 +717,8 @@
 }
 
 .cleanActionButton {
-  min-width: 148px;
+  width: 168px;
+  flex-shrink: 0;
 }
 
 .reviewSummary:focus-visible,
@@ -1137,7 +1138,10 @@
 
 .selectionStatus {
   display: inline-flex;
+  overflow: hidden;
+  min-width: 0;
   min-height: 16px;
+  flex: 1;
   align-items: center;
   color: hsl(var(--gray-10));
   font-weight: 500;
@@ -1155,9 +1159,16 @@
 
 .selectionStatusCopy {
   display: inline-flex;
+  overflow: hidden;
+  min-width: 0;
   align-items: baseline;
   gap: 4px;
   white-space: nowrap;
+}
+
+.selectionStatusCopy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .selectionStatusCopy strong,
@@ -1796,11 +1807,6 @@
     right: 8px;
     bottom: calc(8px + env(safe-area-inset-bottom));
     left: 8px;
-  }
-
-  .cleanActionButton {
-    min-width: 0;
-    flex: 1;
   }
 
   .report,
