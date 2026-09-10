@@ -11,7 +11,7 @@
     "type-check": "tsc --noEmit"
   },
   "engines": {
-    "node": "^22"
+    "node": "^22.22.1"
   },
   "dependencies": {
     "@astral-sh/ruff-wasm-web": "0.9.9",
