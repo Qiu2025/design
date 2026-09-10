@@ -219,6 +219,34 @@
   overflow-y: auto;
 }
 
+.frameModeContent {
+  margin-top: 14px;
+}
+
+.cornerRadiusControl {
+  display: flex;
+  flex-direction: column;
+  color: hsl(var(--gray-10));
+  font-size: 11px;
+  gap: 6px;
+}
+
+.cornerRadiusControl > span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.cornerRadiusControl output {
+  color: hsl(var(--gray-11));
+  font-variant-numeric: tabular-nums;
+}
+
+.cornerRadiusControl input {
+  width: 100%;
+  accent-color: hsl(var(--brand));
+  cursor: pointer;
+}
+
 .subControl,
 .optionRow {
   display: flex;
@@ -874,6 +902,13 @@
 .frameCapture {
   display: inline-flex;
   padding: 6px;
+}
+
+.plainFrame {
+  position: relative;
+  overflow: hidden;
+  background: #24252a;
+  container-type: size;
 }
 
 .deviceFrame:global(.mockframe) :global(.screen) {

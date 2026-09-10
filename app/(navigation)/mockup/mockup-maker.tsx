@@ -79,6 +79,12 @@ const CANVAS_CORNER_RADIUS_RATIO = 0.025;
 const MIN_CANVAS_CORNER_RADIUS = 12;
 const MAX_CANVAS_CORNER_RADIUS = 48;
 
+const MIN_PLAIN_CORNER_RADIUS = 0;
+const MAX_PLAIN_CORNER_RADIUS = 160;
+const DEFAULT_PLAIN_CORNER_RADIUS = 24;
+const PLAIN_FRAME_MAX_DIMENSION = 960;
+const DEFAULT_PLAIN_FRAME_SIZE: ImageDimensions = { width: 960, height: 600 };
+
 const DEFAULT_DEVICE: DeviceName = "iPhone 17";
 
 const DEFAULT_DEVICE_COLORS: Partial<Record<DeviceName, string>> = {
@@ -146,6 +152,7 @@ type HsvColor = {
   value: number;
 };
 
+type FrameMode = "device" | "plain";
 type BackgroundMode = "solid" | "gradient";
 type ExportFormat = "png" | "svg";
 type ExportSize = (typeof EXPORT_SIZE_OPTIONS)[number];
@@ -360,6 +367,8 @@ function hsvToHex({ hue, saturation, value }: HsvColor) {
 }
 
 export function MockupMaker() {
+  const [frameMode, setFrameMode] = useState<FrameMode>("device");
+  const [plainCornerRadius, setPlainCornerRadius] = useState(DEFAULT_PLAIN_CORNER_RADIUS);
   const [selectedDevice, setSelectedDevice] = useState<DeviceName>(DEFAULT_DEVICE);
   const [selectedColor, setSelectedColor] = useState<string | undefined>(getInitialColor(DEFAULT_DEVICE));
   const [landscape, setLandscape] = useState(false);
@@ -428,6 +437,13 @@ export function MockupMaker() {
     landscape && supportsLandscape
       ? `${DeviceOptions[selectedDevice].height} × ${DeviceOptions[selectedDevice].width}`
       : `${DeviceOptions[selectedDevice].width} × ${DeviceOptions[selectedDevice].height}`;
+  const plainFrameSize = useMemo(() => {
+    if (!imageDimensions) return DEFAULT_PLAIN_FRAME_SIZE;
+
+    const scale = Math.min(1, PLAIN_FRAME_MAX_DIMENSION / Math.max(imageDimensions.width, imageDimensions.height));
+    return { width: Math.round(imageDimensions.width * scale), height: Math.round(imageDimensions.height * scale) };
+  }, [imageDimensions]);
+  const exportUnitLabel = frameMode === "plain" ? "Screenshot only" : "Device only";
   const maxBackgroundPaddingHorizontal = getMaxBackgroundPadding(frameGeometry?.width);
   const maxBackgroundPaddingVertical = getMaxBackgroundPadding(frameGeometry?.height);
   const backgroundCanvasSize = frameGeometry
@@ -717,7 +733,7 @@ export function MockupMaker() {
     updateFrameGeometry();
 
     return () => observer.disconnect();
-  }, [frameNode, landscape, selectedColor, selectedDevice]);
+  }, [frameNode, frameMode, landscape, selectedColor, selectedDevice]);
 
   useEffect(() => {
     if (hasCustomizedBackgroundPadding.current || !frameGeometry || !previewDimensions) return;
@@ -771,7 +787,7 @@ export function MockupMaker() {
     updateScreenDimensions();
 
     return () => observer.disconnect();
-  }, [imageUrl, landscape, selectedDevice]);
+  }, [imageUrl, frameMode, landscape, selectedDevice]);
 
   useEffect(() => {
     const viewport = screenViewportRef.current;
@@ -955,7 +971,8 @@ export function MockupMaker() {
 
   const getExportFileName = (format: ExportFormat) => {
     const baseName = imageName?.replace(/\.[^/.]+$/, "") || "mockup";
-    return `${baseName}-${selectedDevice.toLowerCase().replaceAll(" ", "-")}.${format}`;
+    const suffix = frameMode === "plain" ? "plain" : selectedDevice.toLowerCase().replaceAll(" ", "-");
+    return `${baseName}-${suffix}.${format}`;
   };
 
   const savePng = () =>
@@ -1282,76 +1299,124 @@ export function MockupMaker() {
 
             <section className={styles.controlSection} aria-labelledby="device-section-title">
               <div className={styles.sectionHeading}>
-                <h2 id="device-section-title">Device</h2>
+                <h2 id="device-section-title">Frame</h2>
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button type="button" className={styles.select} aria-label="Device">
-                    <span className={styles.selectValue}>{selectedDevice}</span>
-                    <ChevronDownIcon className={styles.selectIcon} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className={styles.deviceMenuContent}>
-                  <DropdownMenuRadioGroup
-                    value={selectedDevice}
-                    onValueChange={(value) => handleDeviceChange(value as DeviceName)}
-                  >
-                    {DEVICE_GROUPS.map((group, index) => (
-                      <div key={group.label}>
-                        {index > 0 && <DropdownMenuSeparator />}
-                        <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
-                        {group.devices.map((device) => (
-                          <DropdownMenuRadioItem key={device} value={device}>
-                            {device}
-                          </DropdownMenuRadioItem>
+              <div className={styles.segmentedControl} role="group" aria-label="Frame type">
+                <button
+                  type="button"
+                  className={cn(styles.segmentButton, frameMode === "device" && styles.segmentButtonActive)}
+                  onClick={() => setFrameMode("device")}
+                  aria-pressed={frameMode === "device"}
+                >
+                  Device
+                </button>
+                <button
+                  type="button"
+                  className={cn(styles.segmentButton, frameMode === "plain" && styles.segmentButtonActive)}
+                  onClick={() => setFrameMode("plain")}
+                  aria-pressed={frameMode === "plain"}
+                >
+                  Plain
+                </button>
+              </div>
+
+              {frameMode === "device" ? (
+                <div className={styles.frameModeContent}>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button type="button" className={styles.select} aria-label="Device">
+                        <span className={styles.selectValue}>{selectedDevice}</span>
+                        <ChevronDownIcon className={styles.selectIcon} />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className={styles.deviceMenuContent}>
+                      <DropdownMenuRadioGroup
+                        value={selectedDevice}
+                        onValueChange={(value) => handleDeviceChange(value as DeviceName)}
+                      >
+                        {DEVICE_GROUPS.map((group, index) => (
+                          <div key={group.label}>
+                            {index > 0 && <DropdownMenuSeparator />}
+                            <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+                            {group.devices.map((device) => (
+                              <DropdownMenuRadioItem key={device} value={device}>
+                                {device}
+                              </DropdownMenuRadioItem>
+                            ))}
+                          </div>
+                        ))}
+                      </DropdownMenuRadioGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  <div className={styles.subControl}>
+                    <span className={styles.controlLabel}>Dimensions</span>
+                    <span className={styles.controlLabel}>{deviceDimensions} px</span>
+                  </div>
+
+                  {colorOptions.length > 0 && (
+                    <div className={styles.subControl}>
+                      <span className={styles.controlLabel}>Finish</span>
+                      <div className={styles.colorRow} role="group" aria-label="Device finish">
+                        {colorOptions.map((color) => (
+                          <button
+                            key={color}
+                            type="button"
+                            className={cn(styles.colorSwatch, selectedColor === color && styles.colorSwatchSelected)}
+                            style={{ background: getSwatchColor(color) }}
+                            onClick={() => setSelectedColor(color)}
+                            aria-label={formatColorName(color)}
+                            aria-pressed={selectedColor === color}
+                          />
                         ))}
                       </div>
-                    ))}
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                    </div>
+                  )}
 
-              <div className={styles.subControl}>
-                <span className={styles.controlLabel}>Dimensions</span>
-                <span className={styles.controlLabel}>{deviceDimensions} px</span>
-              </div>
-
-              {colorOptions.length > 0 && (
-                <div className={styles.subControl}>
-                  <span className={styles.controlLabel}>Finish</span>
-                  <div className={styles.colorRow} role="group" aria-label="Device finish">
-                    {colorOptions.map((color) => (
+                  {supportsLandscape && (
+                    <div className={styles.optionRow}>
+                      <span className={styles.controlLabel}>Orientation</span>
                       <button
-                        key={color}
                         type="button"
-                        className={cn(styles.colorSwatch, selectedColor === color && styles.colorSwatchSelected)}
-                        style={{ background: getSwatchColor(color) }}
-                        onClick={() => setSelectedColor(color)}
-                        aria-label={formatColorName(color)}
-                        aria-pressed={selectedColor === color}
+                        className={styles.toggleButton}
+                        onClick={() => setLandscape((value) => !value)}
+                      >
+                        <RotateClockwiseIcon className="h-4 w-4" />
+                        {landscape ? "Landscape" : "Portrait"}
+                      </button>
+                    </div>
+                  )}
+
+                  {(selectedDevice === "iPhone 17" ||
+                    selectedDevice === "iPhone X" ||
+                    selectedDevice === "MacBook Pro") && (
+                    <label className={styles.checkboxRow}>
+                      <input
+                        type="checkbox"
+                        checked={hideNotch}
+                        onChange={(event) => setHideNotch(event.target.checked)}
                       />
-                    ))}
+                      Hide notch / camera
+                    </label>
+                  )}
+                </div>
+              ) : (
+                <div className={styles.frameModeContent}>
+                  <div className={styles.cornerRadiusControl}>
+                    <span>
+                      <span>Corner radius</span>
+                      <output>{plainCornerRadius}px</output>
+                    </span>
+                    <input
+                      type="range"
+                      min={MIN_PLAIN_CORNER_RADIUS}
+                      max={MAX_PLAIN_CORNER_RADIUS}
+                      value={plainCornerRadius}
+                      onChange={(event) => setPlainCornerRadius(Number(event.target.value))}
+                      aria-label="Corner radius"
+                    />
                   </div>
                 </div>
-              )}
-
-              {supportsLandscape && (
-                <div className={styles.optionRow}>
-                  <span className={styles.controlLabel}>Orientation</span>
-                  <button type="button" className={styles.toggleButton} onClick={() => setLandscape((value) => !value)}>
-                    <RotateClockwiseIcon className="h-4 w-4" />
-                    {landscape ? "Landscape" : "Portrait"}
-                  </button>
-                </div>
-              )}
-
-              {(selectedDevice === "iPhone 17" ||
-                selectedDevice === "iPhone X" ||
-                selectedDevice === "MacBook Pro") && (
-                <label className={styles.checkboxRow}>
-                  <input type="checkbox" checked={hideNotch} onChange={(event) => setHideNotch(event.target.checked)} />
-                  Hide notch / camera
-                </label>
               )}
             </section>
 
@@ -1374,7 +1439,7 @@ export function MockupMaker() {
                   onClick={() => handleExportModeChange(true)}
                   aria-pressed={exportDeviceOnly}
                 >
-                  Device only
+                  {exportUnitLabel}
                 </button>
               </div>
               {!exportDeviceOnly && (
@@ -1630,7 +1695,7 @@ export function MockupMaker() {
               ref={previewRef}
               className={cn(styles.canvasViewport, exportDeviceOnly && styles.canvasTransparent)}
               style={previewBackgroundStyle}
-              aria-label={exportDeviceOnly ? "Device preview" : "Resizable mockup canvas"}
+              aria-label={exportDeviceOnly ? exportUnitLabel + " preview" : "Resizable mockup canvas"}
             >
               <div
                 className={styles.canvasPreview}
@@ -1660,7 +1725,20 @@ export function MockupMaker() {
                       }}
                     >
                       <div ref={setFrameCapture} className={styles.frameCapture}>
-                        <MockFrame {...frameProps}>{screenContent}</MockFrame>
+                        {frameMode === "device" ? (
+                          <MockFrame {...frameProps}>{screenContent}</MockFrame>
+                        ) : (
+                          <div
+                            className={styles.plainFrame}
+                            style={{
+                              width: `${plainFrameSize.width}px`,
+                              height: `${plainFrameSize.height}px`,
+                              borderRadius: `${plainCornerRadius}px`,
+                            }}
+                          >
+                            {screenContent}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
