@@ -805,7 +805,7 @@ export function MockupMaker() {
 
     viewport.addEventListener("wheel", handleWheel, { passive: false });
     return () => viewport.removeEventListener("wheel", handleWheel);
-  }, [imageUrl]);
+  }, [imageUrl, frameMode, landscape, selectedDevice]);
 
   const loadImage = useCallback(async (file: File) => {
     if (!file.type.startsWith("image/")) {
