@@ -1184,13 +1184,6 @@ export function MockupMaker() {
       </NavigationActions>
 
       <main className={styles.container}>
-        <header className={styles.header}>
-          <div>
-            <h1>Mockup Maker</h1>
-            <p>Place a screenshot inside a phone, tablet or laptop frame.</p>
-          </div>
-        </header>
-
         <div className={styles.workspace}>
           <aside className={styles.sidebar} aria-label="Mockup controls">
             <section className={styles.controlSection} aria-labelledby="image-section-title">
