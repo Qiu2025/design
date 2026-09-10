@@ -955,16 +955,14 @@
   justify-content: center;
   background: #24252a;
   color: hsl(var(--gray-9));
-  font-size: clamp(12px, 3cqmin, 24px);
-  gap: 8px;
+  font-size: clamp(16px, 5cqmin, 32px);
+  font-weight: 500;
+  gap: 14px;
 }
 
-.screenPlaceholderHint {
-  max-width: 80%;
-  color: hsl(var(--gray-10));
-  font-size: clamp(10px, 2.5cqmin, 20px);
-  line-height: 1.35;
-  text-align: center;
+.screenPlaceholderIcon {
+  width: clamp(32px, 10cqmin, 64px);
+  height: clamp(32px, 10cqmin, 64px);
 }
 
 @media (prefers-reduced-motion: reduce) {

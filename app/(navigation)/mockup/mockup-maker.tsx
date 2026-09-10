@@ -1104,9 +1104,8 @@ export function MockupMaker() {
     </div>
   ) : (
     <div className={styles.screenPlaceholder}>
-      <ImageIcon className="h-5 w-5" />
+      <ImageIcon className={styles.screenPlaceholderIcon} />
       <span>Your screenshot</span>
-      <span className={styles.screenPlaceholderHint}>Upload a screenshot to start creating your mockup.</span>
     </div>
   );
 
