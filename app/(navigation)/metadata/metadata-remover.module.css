@@ -73,7 +73,8 @@
 .presetButton:focus-visible,
 .groupButton:focus-visible,
 .metadataGroupButton:focus-visible,
-.fileRemove:focus-visible,
+.fileBackButton:focus-visible,
+.fileReplace:focus-visible,
 .inlineAction:focus-visible {
   outline: 1px solid var(--gray-a8);
   outline-offset: 1px;
@@ -264,7 +265,7 @@
   padding: 8px;
   border-style: solid;
   gap: 10px;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
 }
 
 .hiddenInput {
@@ -331,13 +332,7 @@
   font-size: 11px;
 }
 
-.replaceFile {
-  color: hsl(var(--gray-10));
-  font-size: 11px;
-  font-weight: 500;
-}
-
-.fileRemove {
+.fileReplace {
   position: relative;
   z-index: 2;
   display: flex;
@@ -354,9 +349,40 @@
   cursor: pointer;
 }
 
-.fileRemove:hover {
+.fileReplace:hover {
   background: var(--gray-a5);
   color: hsl(var(--gray-12));
+}
+
+.fileBackButton {
+  display: inline-flex;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: hsl(var(--gray-10));
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 500;
+  gap: 5px;
+}
+
+.fileBackButton > svg {
+  width: 14px;
+  height: 14px;
+}
+
+.fileBackButton:hover {
+  background: var(--gray-a3);
+  color: hsl(var(--gray-12));
+}
+
+.fileBackButton:disabled {
+  cursor: wait;
+  opacity: 0.5;
 }
 
 .serverCallout,
@@ -513,7 +539,7 @@
 
 .inspectionSummary {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 11px;
 }
 
@@ -535,17 +561,10 @@
 }
 
 .inspectionSummary h2 {
-  margin: 1px 0 0;
+  margin: 0;
   color: hsl(var(--gray-12));
   font-size: 14px;
   font-weight: 500;
-}
-
-.inspectionSummary p {
-  margin: 4px 0 0;
-  color: hsl(var(--gray-10));
-  font-size: 11px;
-  line-height: 1.45;
 }
 
 .mobileFlow .cleaningControls {
@@ -553,62 +572,6 @@
   margin-top: 14px;
 }
 
-.mobileFlow .presetButtons {
-  width: 100%;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  gap: 8px;
-}
-
-.presetButtonsSingle {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.mobileFlow .presetButton {
-  display: flex;
-  height: auto;
-  min-height: 62px;
-  justify-content: space-between;
-  padding: 10px 12px;
-  border: 1px solid var(--gray-a4);
-  border-radius: 9px;
-  background: var(--gray-a2);
-  text-align: left;
-}
-
-.mobileFlow .presetButton:hover {
-  border-color: var(--gray-a6);
-  background: var(--gray-a3);
-}
-
-.mobileFlow .presetButtonActive,
-.mobileFlow .presetButtonActive:hover {
-  border-color: hsla(var(--brand), 0.48);
-  background: hsla(var(--brand), 0.08);
-  box-shadow: inset 0 0 0 1px hsla(var(--brand), 0.12);
-}
-
-.presetCopy {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 3px;
-}
-
-.presetCopy strong {
-  color: hsl(var(--gray-12));
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.presetCopy > span {
-  color: hsl(var(--gray-9));
-  font-size: 10px;
-  line-height: 1.35;
-}
-
-.presetCount,
 .protectedCount {
   display: inline-flex;
   min-width: 24px;
@@ -622,11 +585,6 @@
   color: hsl(var(--gray-10));
   font-size: 10px;
   font-variant-numeric: tabular-nums;
-}
-
-.mobileFlow .presetButtonActive .presetCount {
-  background: hsla(var(--brand), 0.14);
-  color: hsl(var(--brand));
 }
 
 .reviewDisclosure {
@@ -796,10 +754,63 @@
   border-bottom: 1px solid var(--gray-a3);
 }
 
-.metadataHeader p {
-  margin: 3px 0 0;
-  color: hsl(var(--gray-10));
+.metadataHeaderControls {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.metadataHeader > h2 {
+  overflow: hidden;
+  flex-shrink: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metadataSelectionButton {
+  display: inline-flex;
+  height: 30px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px;
+  border: 1px solid var(--gray-a3);
+  border-radius: 6px;
+  background: var(--gray-a3);
+  color: hsl(var(--gray-11));
+  cursor: pointer;
   font-size: 11px;
+  font-weight: 500;
+  gap: 6px;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.metadataSelectionButton > svg {
+  width: 14px;
+  height: 14px;
+  color: hsl(var(--gray-10));
+}
+
+.metadataSelectionButton:hover {
+  border-color: var(--gray-a5);
+  background: var(--gray-a4);
+  color: hsl(var(--gray-12));
+}
+
+.metadataSelectionButton:focus-visible {
+  outline: 1px solid var(--gray-a8);
+  outline-offset: 1px;
+}
+
+.metadataSelectionButton:disabled {
+  cursor: wait;
+  opacity: 0.5;
 }
 
 .metadataSearch {
@@ -907,11 +918,45 @@
 }
 
 .metadataScrollInner {
-  padding: 0 18px 18px;
+  padding: 0 18px;
 }
 
 .metadataGroup + .metadataGroup {
   margin-top: 18px;
+}
+
+.desktopOnly .metadataGroup + .metadataGroup {
+  margin-top: 8px;
+}
+
+.searchGroupHeader {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  padding: 8px 28px 6px;
+  background: hsl(var(--panel));
+  gap: 10px;
+  margin-inline: -18px;
+}
+
+.searchGroupHeader::after {
+  height: 1px;
+  flex: 1;
+  background: var(--gray-a3);
+  content: "";
+}
+
+.searchGroupHeader h3 {
+  margin: 0;
+  color: hsl(var(--gray-10));
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.055em;
+  line-height: 1.2;
+  text-transform: uppercase;
 }
 
 .metadataGroupHeader {
@@ -978,6 +1023,10 @@
   border-bottom: 1px solid var(--gray-a3);
 }
 
+.desktopOnly .metadataList {
+  margin-inline: -18px;
+}
+
 .metadataRow {
   display: grid;
   min-height: 44px;
@@ -988,6 +1037,10 @@
   gap: 10px;
   grid-template-columns: 18px minmax(180px, 34%) minmax(0, 1fr);
   transition: background-color 120ms ease;
+}
+
+.desktopOnly .metadataRow {
+  padding-inline: 28px;
 }
 
 .metadataRow + .metadataRow {
@@ -1366,6 +1419,111 @@
   white-space: nowrap;
 }
 
+@media (min-width: 841px) {
+  .workspaceWorkbench .workflowControls {
+    padding: 0;
+  }
+
+  .workspaceWorkbench .panelHeading {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 16px 18px 0;
+    gap: 10px;
+  }
+
+  .workspaceWorkbench .panelHeadingWithFile {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .workspaceWorkbench .panelHeading h2,
+  .workspaceWorkbench .sectionHeading h3,
+  .workspaceWorkbench .groupRailTitle {
+    color: hsl(var(--gray-12));
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .workspaceWorkbench .panelHeading h2 {
+    font-size: 14px;
+  }
+
+  .workspaceWorkbench .modeToggle {
+    width: 100%;
+  }
+
+  .workspaceWorkbench .dropZone {
+    margin: 10px 18px 18px;
+  }
+
+  .workspaceWorkbench .controlBlock,
+  .workspaceWorkbench .serverCallout,
+  .workspaceWorkbench .processingPanel,
+  .workspaceWorkbench .feedback {
+    width: auto;
+    margin-right: 18px;
+    margin-left: 18px;
+  }
+
+  .workspaceWorkbench .feedback:last-child {
+    margin-bottom: 18px;
+  }
+
+  .workspaceWorkbench .cleaningControls {
+    padding: 16px 18px 18px;
+    border-top: 1px solid var(--gray-a3);
+    margin-top: 0;
+  }
+
+  .workspaceWorkbench .presetButtons {
+    margin-top: 11px;
+  }
+
+  .workspaceWorkbench .groupRail {
+    padding: 16px 18px;
+  }
+
+  .workspaceWorkbench .groupRailTitle {
+    padding: 0 0 11px;
+  }
+
+  .workspaceWorkbench .groupList {
+    gap: 6px;
+  }
+
+  .workspaceWorkbench .groupButton {
+    min-height: 36px;
+    padding: 7px 10px;
+    border: 1px solid var(--gray-a3);
+    border-radius: 7px;
+    background: var(--gray-a2);
+    color: hsl(var(--gray-11));
+  }
+
+  .workspaceWorkbench .groupButton:hover:not(.groupButtonActive) {
+    border-color: var(--gray-a5);
+    background: var(--gray-a3);
+  }
+
+  .workspaceWorkbench .groupButtonActive {
+    border-color: var(--gray-a5);
+    background: var(--gray-a4);
+    box-shadow: inset 0 0 0 1px var(--gray-a2);
+  }
+
+  .workspaceWorkbench .groupButtonActive span:last-child {
+    color: hsl(var(--gray-10));
+  }
+
+  .workspaceWorkbench .groupRail::after {
+    height: 1px;
+    flex-shrink: 0;
+    margin: 16px -18px 0;
+    background: var(--gray-a3);
+    content: "";
+  }
+}
+
 @media (max-width: 1180px) {
   .workspaceWorkbench {
     grid-template-columns: 312px minmax(0, 1fr);
@@ -1425,10 +1583,6 @@
     flex-direction: column;
   }
 
-  .modeToggleAfterSelection {
-    display: none;
-  }
-
   .container {
     overflow: visible;
     height: auto;
@@ -1448,6 +1602,7 @@
   .workspaceWorkbench {
     overflow: visible;
     height: auto;
+    flex: none;
     border: 0;
     border-radius: 0;
     background: transparent;
@@ -1455,7 +1610,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .workspaceWorkbench:has(.cleanActionBar) {
+  .workspaceWorkbench:has(.cleanActionBar):has(.reviewDisclosure[open]) {
     padding-bottom: calc(76px + env(safe-area-inset-bottom));
   }
 
@@ -1479,28 +1634,42 @@
   .workspaceWorkbench .groupRail {
     min-height: auto;
     flex: none;
-    padding: 8px 12px;
+    padding: 16px 18px;
   }
 
   .groupRailTitle {
-    display: none;
+    display: block;
+    padding: 0 0 11px;
+    color: hsl(var(--gray-12));
+    font-size: 13px;
+    font-weight: 500;
   }
 
   .groupList {
-    flex-direction: row;
-    gap: 4px;
-    overflow-x: auto;
-    overflow-y: hidden;
+    overflow: visible;
+    flex-direction: column;
+    gap: 6px;
   }
 
   .groupButton {
-    width: auto;
-    min-width: max-content;
-    grid-template-columns: auto auto;
+    width: 100%;
+    min-height: 36px;
+    padding: 7px 10px;
+    border: 1px solid var(--gray-a3);
+    border-radius: 7px;
+    background: var(--gray-a2);
+    color: hsl(var(--gray-11));
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .groupButtonActive {
-    box-shadow: inset 0 -2px 0 hsla(var(--brand), 0.75);
+    border-color: var(--gray-a5);
+    background: var(--gray-a4);
+    box-shadow: inset 0 0 0 1px var(--gray-a2);
+  }
+
+  .groupButtonActive span:last-child {
+    color: hsl(var(--gray-10));
   }
 
   .resultsColumn {
@@ -1571,27 +1740,9 @@
     padding: 12px;
   }
 
-  .dropZoneHasFile {
-    grid-template-columns: auto minmax(0, 1fr) auto;
-  }
-
-  .replaceFile {
-    display: none;
-  }
-
   .mobileFlow .metadataPanel {
     height: auto;
     min-height: 0;
-  }
-
-  .mobileFlow .metadataHeader {
-    min-height: 92px;
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .mobileFlow .metadataSearch {
-    width: 100%;
   }
 
   .mobileFlow .metadataContent {
@@ -1604,11 +1755,11 @@
   }
 
   .mobileFlow .metadataRow {
-    min-height: 54px;
-    align-items: start;
+    min-height: 44px;
+    align-items: center;
     padding: 8px;
-    gap: 3px 8px;
-    grid-template-columns: 18px minmax(0, 1fr);
+    gap: 8px;
+    grid-template-columns: 18px minmax(0, 1fr) minmax(0, 0.85fr);
   }
 
   .mobileFlow .metadataCheckbox {
@@ -1620,7 +1771,7 @@
   }
 
   .mobileFlow .metadataValue {
-    grid-column: 2;
+    text-align: right;
   }
 
   .modeButton,

@@ -78,6 +78,21 @@ const getOutputImageName = (fileName: string, format: ImageFormat) => {
   return `${baseName || "image"}-clean.${IMAGE_FORMAT_DETAILS[format].canonicalExtension}`;
 };
 
+const ensureRandomUuid = () => {
+  if (typeof crypto.randomUUID === "function") return;
+
+  Object.defineProperty(crypto, "randomUUID", {
+    configurable: true,
+    value: () => {
+      const bytes = crypto.getRandomValues(new Uint8Array(16));
+      bytes[6] = (bytes[6] & 0x0f) | 0x40;
+      bytes[8] = (bytes[8] & 0x3f) | 0x80;
+      const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    },
+  });
+};
+
 const exiftoolFetch = (...args: unknown[]) => {
   const [input, init] = args as [RequestInfo | URL, RequestInit | undefined];
   const requestedUrl = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
@@ -203,6 +218,7 @@ const inspectLocalImageWithFormat = async (file: File) => {
   const support = getLocalImageSupport(file);
   if (!support.supported) throw new Error(support.reason || "Unsupported image format.");
 
+  ensureRandomUuid();
   const { parseMetadata } = await import("@uswriting/exiftool");
   const result = await parseMetadata(file, {
     args: ["-json", "-G1", "-s", "-duplicates", "-api", "LargeFileSupport=1"],
@@ -241,6 +257,7 @@ export const cleanLocalImage = async (
 
   const sourceFormat = detectedImageFormats.get(file) || (await inspectLocalImageWithFormat(file)).format;
 
+  ensureRandomUuid();
   const { writeMetadata } = await import("@uswriting/exiftool");
   const deleteMap = Object.fromEntries(selected.map((entry) => [entry.key, ""]));
   const result = await writeMetadata(file, deleteMap, {

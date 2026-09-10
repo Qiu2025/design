@@ -1,7 +1,9 @@
 "use client";
 
 import {
+  ArrowLeftIcon,
   CheckCircleIcon,
+  CheckListIcon,
   ChevronRightIcon,
   DownloadIcon,
   EraserIcon,
@@ -9,7 +11,8 @@ import {
   ImageIcon,
   LockIcon,
   MagnifyingGlassIcon,
-  TrashIcon,
+  MinusCircleIcon,
+  RepeatIcon,
   UploadIcon,
   WarningIcon,
   XMarkCircleIcon,
@@ -168,9 +171,10 @@ export function MetadataRemover() {
     processingState === "inspecting" || processingState === "uploading" || processingState === "processing";
   const selectedCount = selectedMetadata.size;
   const removableEntries = useMemo(() => metadataEntries.filter((entry) => !entry.protected), [metadataEntries]);
-  const protectedCount = metadataEntries.length - removableEntries.length;
-  const recommendedCount = useMemo(() => getPresetSelection(metadataEntries, "safe").size, [metadataEntries]);
-  const hasDistinctPresets = recommendedCount !== removableEntries.length;
+  const hasDistinctPresets = useMemo(
+    () => getPresetSelection(metadataEntries, "safe").size !== removableEntries.length,
+    [metadataEntries, removableEntries.length],
+  );
   const serverTooLarge = Boolean(file && file.size > MAX_SERVER_VIDEO_BYTES);
   const duplicateMetadataLabels = useMemo(() => {
     const counts = new Map<string, number>();
@@ -221,6 +225,9 @@ export function MetadataRemover() {
     const selectedGroup = metadataGroups.find(([group]) => group === activeGroup);
     return selectedGroup ? [selectedGroup] : metadataGroups.slice(0, 1);
   }, [activeGroup, groupedEntries, metadataGroups, metadataQuery]);
+  const visibleSelectableEntries = visibleGroups.flatMap(([, entries]) => entries.filter((entry) => !entry.protected));
+  const allVisibleMetadataSelected =
+    visibleSelectableEntries.length > 0 && visibleSelectableEntries.every((entry) => selectedMetadata.has(entry.id));
 
   const clearInspection = useCallback((preserveWorkbench = false) => {
     inspectionRequestRef.current += 1;
@@ -557,7 +564,7 @@ export function MetadataRemover() {
     if (droppedFile) setSelectedFile(droppedFile);
   };
 
-  const removeFile = () => {
+  const resetFile = () => {
     setFile(null);
     clearInspection();
     if (inputRef.current) inputRef.current.value = "";
@@ -598,7 +605,7 @@ export function MetadataRemover() {
               remembered only for this browser session.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter>
+          <DialogFooter className="gap-2 sm:gap-0">
             <Button variant="secondary" onClick={() => settleServerConsent(false)}>
               Cancel
             </Button>
@@ -629,32 +636,40 @@ export function MetadataRemover() {
         <div className={cn(styles.workspace, showWorkbench ? styles.workspaceWorkbench : styles.workspaceSetup)}>
           <aside className={styles.workflowPanel} aria-labelledby="file-panel-title">
             <div className={styles.workflowControls}>
-              <div className={styles.panelHeading}>
+              <div className={cn(styles.panelHeading, file && styles.panelHeadingWithFile)}>
                 <h2 id="file-panel-title">File</h2>
-                <div
-                  className={cn(styles.modeToggle, file && styles.modeToggleAfterSelection)}
-                  role="group"
-                  aria-label="File type"
-                >
+                {file ? (
                   <button
                     type="button"
-                    onClick={() => changeMode("image")}
-                    className={cn(styles.modeButton, mode === "image" && styles.modeButtonActive)}
-                    aria-pressed={mode === "image"}
+                    className={styles.fileBackButton}
+                    onClick={resetFile}
+                    aria-label="Back to file type selection"
                     disabled={isBusy}
                   >
-                    <ImageIcon className="h-4 w-4" /> Image
+                    <ArrowLeftIcon aria-hidden="true" /> Back
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => changeMode("video")}
-                    className={cn(styles.modeButton, mode === "video" && styles.modeButtonActive)}
-                    aria-pressed={mode === "video"}
-                    disabled={isBusy}
-                  >
-                    <FilmStripIcon className="h-4 w-4" /> Video
-                  </button>
-                </div>
+                ) : (
+                  <div className={styles.modeToggle} role="group" aria-label="File type">
+                    <button
+                      type="button"
+                      onClick={() => changeMode("image")}
+                      className={cn(styles.modeButton, mode === "image" && styles.modeButtonActive)}
+                      aria-pressed={mode === "image"}
+                      disabled={isBusy}
+                    >
+                      <ImageIcon className="h-4 w-4" /> Image
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => changeMode("video")}
+                      className={cn(styles.modeButton, mode === "video" && styles.modeButtonActive)}
+                      aria-pressed={mode === "video"}
+                      disabled={isBusy}
+                    >
+                      <FilmStripIcon className="h-4 w-4" /> Video
+                    </button>
+                  </div>
+                )}
               </div>
 
               {mode === "video" && (
@@ -732,19 +747,16 @@ export function MetadataRemover() {
                     </div>
                     <div className={styles.fileInfo}>
                       <p className={styles.fileName}>{file.name}</p>
-                      <p className={styles.fileSize}>
-                        {formatBytes(file.size)} · {getOutputFileName(file.name, "clean")}
-                      </p>
+                      <p className={styles.fileSize}>{formatBytes(file.size)}</p>
                     </div>
-                    <span className={styles.replaceFile}>Replace</span>
                     <button
                       type="button"
-                      className={styles.fileRemove}
-                      onClick={removeFile}
-                      aria-label="Remove file"
+                      className={styles.fileReplace}
+                      onClick={() => inputRef.current?.click()}
+                      aria-label="Choose another file"
                       disabled={isBusy}
                     >
-                      <TrashIcon className="h-4 w-4" />
+                      <RepeatIcon className="h-4 w-4" />
                     </button>
                   </>
                 ) : (
@@ -820,7 +832,7 @@ export function MetadataRemover() {
                 </div>
               )}
 
-              {file && metadataEntries.length > 0 && removableEntries.length > 0 && !isBusy && (
+              {file && metadataEntries.length > 0 && removableEntries.length > 0 && hasDistinctPresets && !isBusy && (
                 <section
                   className={cn(styles.cleaningControls, styles.desktopOnly)}
                   aria-labelledby="desktop-cleaning-level-title"
@@ -1005,29 +1017,41 @@ export function MetadataRemover() {
 
               <section className={cn(styles.metadataPanel, styles.desktopOnly)} aria-labelledby="metadata-panel-title">
                 <div className={styles.metadataHeader}>
-                  <div>
-                    <h2 id="metadata-panel-title">Metadata</h2>
+                  <h2 id="metadata-panel-title">
+                    {metadataQuery.trim() ? "Search results" : visibleGroups[0]?.[0] || "Metadata"}
+                  </h2>
+                  <div className={styles.metadataHeaderControls}>
+                    {visibleSelectableEntries.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => selectGroup(visibleSelectableEntries, !allVisibleMetadataSelected)}
+                        className={styles.metadataSelectionButton}
+                        disabled={isBusy}
+                      >
+                        {allVisibleMetadataSelected ? (
+                          <MinusCircleIcon aria-hidden="true" />
+                        ) : (
+                          <CheckListIcon aria-hidden="true" />
+                        )}
+                        {allVisibleMetadataSelected ? "Clear" : "Select all"}
+                      </button>
+                    )}
                     {metadataEntries.length > 0 && (
-                      <p>
-                        {removableEntries.length} removable · {protectedCount} protected
-                      </p>
+                      <Input
+                        value={metadataQuery}
+                        onChange={(event) => setMetadataQuery(event.target.value)}
+                        placeholder="Search metadata"
+                        aria-label="Search metadata fields or values"
+                        variant="soft"
+                        className={styles.metadataSearch}
+                        disabled={isBusy}
+                      >
+                        <InputSlot side="left">
+                          <MagnifyingGlassIcon className="h-4 w-4" />
+                        </InputSlot>
+                      </Input>
                     )}
                   </div>
-                  {metadataEntries.length > 0 && (
-                    <Input
-                      value={metadataQuery}
-                      onChange={(event) => setMetadataQuery(event.target.value)}
-                      placeholder="Search metadata"
-                      aria-label="Search metadata fields or values"
-                      variant="soft"
-                      className={styles.metadataSearch}
-                      disabled={isBusy}
-                    >
-                      <InputSlot side="left">
-                        <MagnifyingGlassIcon className="h-4 w-4" />
-                      </InputSlot>
-                    </Input>
-                  )}
                 </div>
 
                 {metadataEntries.length > 0 ? (
@@ -1037,37 +1061,13 @@ export function MetadataRemover() {
                         <div className={styles.metadataScrollInner}>
                           {visibleGroups.length > 0 ? (
                             visibleGroups.map(([group, entries]) => {
-                              const selectable = entries.filter((entry) => !entry.protected);
                               return (
                                 <section key={group} className={styles.metadataGroup}>
-                                  <div className={styles.metadataGroupHeader}>
-                                    <div className={styles.metadataGroupTitle}>
+                                  {metadataQuery.trim() && (
+                                    <header className={styles.searchGroupHeader}>
                                       <h3>{group}</h3>
-                                      <span>
-                                        {entries.length} {entries.length === 1 ? "field" : "fields"}
-                                      </span>
-                                    </div>
-                                    {selectable.length > 0 && (
-                                      <div className={styles.metadataGroupActions}>
-                                        <button
-                                          type="button"
-                                          onClick={() => selectGroup(selectable, true)}
-                                          className={styles.metadataGroupButton}
-                                          disabled={isBusy}
-                                        >
-                                          Select all
-                                        </button>
-                                        <button
-                                          type="button"
-                                          onClick={() => selectGroup(selectable, false)}
-                                          className={styles.metadataGroupButton}
-                                          disabled={isBusy}
-                                        >
-                                          Clear
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
+                                    </header>
+                                  )}
                                   <div className={styles.metadataList}>
                                     {entries.map((entry) => {
                                       const MetadataRow = entry.protected ? "div" : "label";
@@ -1182,25 +1182,16 @@ export function MetadataRemover() {
                             ? "This file already appears clean"
                             : `${removableEntries.length} removable ${removableEntries.length === 1 ? "field" : "fields"} found`}
                         </h2>
-                        <p>
-                          {protectedCount > 0
-                            ? `${protectedCount} required ${protectedCount === 1 ? "field" : "fields"} will be kept so the file continues to work.`
-                            : "No required fields need to be preserved."}
-                        </p>
                       </div>
                     </div>
 
-                    {removableEntries.length > 0 && (
+                    {removableEntries.length > 0 && hasDistinctPresets && (
                       <section className={styles.cleaningControls} aria-labelledby="mobile-cleaning-level-title">
                         <div className={styles.sectionHeading}>
                           <h3 id="mobile-cleaning-level-title">Cleaning level</h3>
                           {preset === "custom" && <span className={styles.customBadge}>Custom</span>}
                         </div>
-                        <div
-                          className={cn(styles.presetButtons, !hasDistinctPresets && styles.presetButtonsSingle)}
-                          role="group"
-                          aria-label="Cleaning level"
-                        >
+                        <div className={styles.presetButtons} role="group" aria-label="Cleaning level">
                           <button
                             type="button"
                             className={cn(styles.presetButton, preset === "safe" && styles.presetButtonActive)}
@@ -1208,31 +1199,17 @@ export function MetadataRemover() {
                             aria-pressed={preset === "safe"}
                             disabled={isBusy}
                           >
-                            <span className={styles.presetCopy}>
-                              <strong>Recommended</strong>
-                              <span>
-                                {hasDistinctPresets
-                                  ? "Remove privacy-sensitive metadata"
-                                  : "Remove all metadata that can be safely cleaned"}
-                              </span>
-                            </span>
-                            <span className={styles.presetCount}>{recommendedCount}</span>
+                            Safe
                           </button>
-                          {hasDistinctPresets && (
-                            <button
-                              type="button"
-                              className={cn(styles.presetButton, preset === "maximum" && styles.presetButtonActive)}
-                              onClick={() => applyPreset("maximum")}
-                              aria-pressed={preset === "maximum"}
-                              disabled={isBusy}
-                            >
-                              <span className={styles.presetCopy}>
-                                <strong>Maximum</strong>
-                                <span>Remove every non-required field</span>
-                              </span>
-                              <span className={styles.presetCount}>{removableEntries.length}</span>
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            className={cn(styles.presetButton, preset === "maximum" && styles.presetButtonActive)}
+                            onClick={() => applyPreset("maximum")}
+                            aria-pressed={preset === "maximum"}
+                            disabled={isBusy}
+                          >
+                            Maximum
+                          </button>
                         </div>
                       </section>
                     )}
@@ -1255,89 +1232,64 @@ export function MetadataRemover() {
                       </summary>
 
                       <div className={styles.reviewBody}>
-                        {removableEntries.length > 10 && (
-                          <div className={styles.metadataHeader}>
-                            <span>Search fields and values</span>
-                            <Input
-                              value={metadataQuery}
-                              onChange={(event) => setMetadataQuery(event.target.value)}
-                              placeholder="Search metadata"
-                              aria-label="Search metadata fields or values"
-                              variant="soft"
-                              className={styles.metadataSearch}
-                              disabled={isBusy}
-                            >
-                              <InputSlot side="left">
-                                <MagnifyingGlassIcon className="h-4 w-4" />
-                              </InputSlot>
-                            </Input>
-                          </div>
-                        )}
-
                         <div className={styles.metadataBrowser}>
                           <div className={styles.metadataContent}>
                             <div className={styles.metadataScroll}>
                               <div className={styles.metadataScrollInner}>
                                 {visibleRemovableGroups.length > 0 || visibleProtectedEntries.length > 0 ? (
                                   <>
-                                    {visibleRemovableGroups.map(([group, entries]) => (
-                                      <section key={group} className={styles.metadataGroup}>
-                                        <div className={styles.metadataGroupHeader}>
-                                          <div className={styles.metadataGroupTitle}>
-                                            <h3>{group}</h3>
-                                            <span>
-                                              {entries.length} {entries.length === 1 ? "field" : "fields"}
-                                            </span>
-                                          </div>
-                                          <div className={styles.metadataGroupActions}>
-                                            <button
-                                              type="button"
-                                              onClick={() => selectGroup(entries, true)}
-                                              className={styles.metadataGroupButton}
-                                              disabled={isBusy}
-                                            >
-                                              Select all
-                                            </button>
-                                            <button
-                                              type="button"
-                                              onClick={() => selectGroup(entries, false)}
-                                              className={styles.metadataGroupButton}
-                                              disabled={isBusy}
-                                            >
-                                              Clear
-                                            </button>
-                                          </div>
-                                        </div>
-                                        <div className={styles.metadataList}>
-                                          {entries.map((entry) => (
-                                            <label
-                                              key={entry.id}
-                                              className={cn(
-                                                styles.metadataRow,
-                                                selectedMetadata.has(entry.id) && styles.metadataRowSelected,
-                                              )}
-                                            >
-                                              <input
-                                                type="checkbox"
-                                                checked={selectedMetadata.has(entry.id)}
+                                    {visibleRemovableGroups.map(([group, entries]) => {
+                                      const allEntriesSelected = entries.every((entry) =>
+                                        selectedMetadata.has(entry.id),
+                                      );
+                                      return (
+                                        <section key={group} className={styles.metadataGroup}>
+                                          <div className={styles.metadataGroupHeader}>
+                                            <div className={styles.metadataGroupTitle}>
+                                              <h3>{group}</h3>
+                                            </div>
+                                            <div className={styles.metadataGroupActions}>
+                                              <button
+                                                type="button"
+                                                onClick={() => selectGroup(entries, !allEntriesSelected)}
+                                                className={styles.metadataGroupButton}
                                                 disabled={isBusy}
-                                                onChange={() => toggleMetadataSelection(entry)}
-                                                className={styles.metadataCheckbox}
-                                              />
-                                              <span className={styles.metadataField}>
-                                                <span className={styles.metadataKey}>{entry.label}</span>
-                                                {duplicateMetadataLabels.has(normalizeMetadataLabel(entry.label)) && (
-                                                  <span className={styles.metadataOrigin}>{entry.sourceLabel}</span>
+                                              >
+                                                {allEntriesSelected ? "Clear" : "Select all"}
+                                              </button>
+                                            </div>
+                                          </div>
+                                          <div className={styles.metadataList}>
+                                            {entries.map((entry) => (
+                                              <label
+                                                key={entry.id}
+                                                className={cn(
+                                                  styles.metadataRow,
+                                                  selectedMetadata.has(entry.id) && styles.metadataRowSelected,
                                                 )}
-                                              </span>
-                                              <span className={styles.metadataValue} title={entry.value}>
-                                                {entry.value}
-                                              </span>
-                                            </label>
-                                          ))}
-                                        </div>
-                                      </section>
-                                    ))}
+                                              >
+                                                <input
+                                                  type="checkbox"
+                                                  checked={selectedMetadata.has(entry.id)}
+                                                  disabled={isBusy}
+                                                  onChange={() => toggleMetadataSelection(entry)}
+                                                  className={styles.metadataCheckbox}
+                                                />
+                                                <span className={styles.metadataField}>
+                                                  <span className={styles.metadataKey}>{entry.label}</span>
+                                                  {duplicateMetadataLabels.has(normalizeMetadataLabel(entry.label)) && (
+                                                    <span className={styles.metadataOrigin}>{entry.sourceLabel}</span>
+                                                  )}
+                                                </span>
+                                                <span className={styles.metadataValue} title={entry.value}>
+                                                  {entry.value}
+                                                </span>
+                                              </label>
+                                            ))}
+                                          </div>
+                                        </section>
+                                      );
+                                    })}
 
                                     {visibleProtectedEntries.length > 0 && (
                                       <details className={styles.protectedDisclosure}>

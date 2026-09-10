@@ -99,6 +99,9 @@ const getSafeErrorDiagnostic = (error: unknown) => [
   sanitizeDiagnosticLine(error instanceof Error ? `${error.name}: ${error.message}` : String(error)),
 ];
 
+const createOperationId = () =>
+  Array.from(crypto.getRandomValues(new Uint32Array(4)), (value) => value.toString(16).padStart(8, "0")).join("");
+
 const runLocalVideoOperation = <T>(operation: () => Promise<T>) => {
   const result = localVideoOperationQueue.then(operation, operation);
   localVideoOperationQueue = result.then(
@@ -284,7 +287,7 @@ const withMountedFile = async <T>(file: File, operation: (ffmpeg: FFmpegInstance
     });
   }
   const { FFFSType } = await import("@ffmpeg/ffmpeg");
-  const operationId = crypto.randomUUID().replace(/-/g, "");
+  const operationId = createOperationId();
   const mountPath = `/input-${operationId}` as `/${string}`;
   const extension = getExtension(file.name);
   const mountedName = `input${extension ? `.${extension}` : ""}`;
@@ -309,7 +312,7 @@ const withMountedFile = async <T>(file: File, operation: (ffmpeg: FFmpegInstance
 };
 
 const probePath = async (ffmpeg: FFmpegInstance, inputPath: string, stage: "probe" | "verify") => {
-  const outputPath = `probe-${crypto.randomUUID().replace(/-/g, "")}.json`;
+  const outputPath = `probe-${createOperationId()}.json`;
   const diagnostics = captureFfmpegDiagnostics(ffmpeg);
 
   try {
@@ -652,7 +655,7 @@ export const cleanLocalVideo = async (
         : `${requestedOutputName.replace(/\.+$/, "")}.${container.extension}`;
 
       const outputData = await withMountedFile(file, async (ffmpeg, inputPath) => {
-        const outputPath = `output-${crypto.randomUUID().replace(/-/g, "")}.${container.extension}`;
+        const outputPath = `output-${createOperationId()}.${container.extension}`;
         const args = [
           "-y",
           "-hide_banner",
