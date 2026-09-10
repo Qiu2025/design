@@ -33,6 +33,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
@@ -831,8 +832,7 @@ export function MockupMaker() {
     return () => window.removeEventListener("paste", handlePaste);
   }, [loadImage]);
 
-  const handleDeviceChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    const nextDevice = event.target.value as DeviceName;
+  const handleDeviceChange = (nextDevice: DeviceName) => {
     setSelectedDevice(nextDevice);
     setSelectedColor(getInitialColor(nextDevice));
   };
@@ -1285,22 +1285,32 @@ export function MockupMaker() {
               <div className={styles.sectionHeading}>
                 <h2 id="device-section-title">Device</h2>
               </div>
-              <select
-                className={styles.select}
-                value={selectedDevice}
-                onChange={handleDeviceChange}
-                aria-label="Device"
-              >
-                {DEVICE_GROUPS.map((group) => (
-                  <optgroup key={group.label} label={group.label}>
-                    {group.devices.map((device) => (
-                      <option key={device} value={device}>
-                        {device}
-                      </option>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" className={styles.select} aria-label="Device">
+                    <span className={styles.selectValue}>{selectedDevice}</span>
+                    <ChevronDownIcon className={styles.selectIcon} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className={styles.deviceMenuContent}>
+                  <DropdownMenuRadioGroup
+                    value={selectedDevice}
+                    onValueChange={(value) => handleDeviceChange(value as DeviceName)}
+                  >
+                    {DEVICE_GROUPS.map((group, index) => (
+                      <div key={group.label}>
+                        {index > 0 && <DropdownMenuSeparator />}
+                        <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+                        {group.devices.map((device) => (
+                          <DropdownMenuRadioItem key={device} value={device}>
+                            {device}
+                          </DropdownMenuRadioItem>
+                        ))}
+                      </div>
                     ))}
-                  </optgroup>
-                ))}
-              </select>
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               <div className={styles.subControl}>
                 <span className={styles.controlLabel}>Dimensions</span>
